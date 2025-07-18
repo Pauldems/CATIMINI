@@ -13,6 +13,7 @@ export function findAvailableSlots(
   const searchStart = startSearchDate || new Date();
   const searchEnd = new Date(searchStart);
   searchEnd.setDate(searchEnd.getDate() + 90); // Chercher sur 3 mois
+  
 
   // Parcourir chaque jour
   for (let date = new Date(searchStart); date <= searchEnd; date.setDate(date.getDate() + 1)) {
@@ -21,72 +22,38 @@ export function findAvailableSlots(
     // Vérifier les indisponibilités pour cette date
     const participantUnavailabilities: { [userId: string]: Availability[] } = {};
     const participantEvents: { [userId: string]: Event[] } = {};
-    let anyParticipantFullyUnavailable = false;
 
     for (const userId of participants) {
       const userUnavails = availabilities[userId]?.filter(
         (a) => a.date === dateStr && !a.isAvailable
       ) || [];
       
+      console.log(`🔍 [SlotFinder] Utilisateur ${userId} sur ${dateStr}: ${userUnavails.length} indisponibilités trouvées`);
+      userUnavails.forEach(unavail => {
+        console.log(`   - ${unavail.startTime}-${unavail.endTime} ${unavail.createdByEvent ? `(créée par événement ${unavail.createdByEvent})` : '(manuelle)'}`);
+      });
+      
       participantUnavailabilities[userId] = userUnavails;
       
       // Récupérer les événements existants pour cet utilisateur à cette date
       const userEvents = existingEvents?.filter(event => {
         if (!event.participants.includes(userId)) return false;
-        const eventStartDate = new Date(event.startDate);
-        const eventEndDate = new Date(event.endDate);
-        return date >= eventStartDate && date <= eventEndDate;
+        
+        // Comparer les dates string directement (même logique que conflictChecker)
+        const currentDateStr = dateStr;
+        const isOnDate = currentDateStr >= event.startDate && currentDateStr <= event.endDate;
+        console.log(`🔍 [SlotFinder] Utilisateur ${userId}, événement ${event.title}: ${isOnDate ? '✅' : '❌'} (${currentDateStr} vs ${event.startDate}-${event.endDate})`);
+        return isOnDate;
       }) || [];
       
       participantEvents[userId] = userEvents;
       
-      // Vérifier si l'utilisateur a des indisponibilités qui couvrent complètement les heures souhaitées
-      if (preferredStartTime && preferredEndTime) {
-        const preferredStartHour = preferredStartTime.getHours();
-        const preferredEndHour = preferredEndTime.getHours();
-        
-        // Vérifier si les indisponibilités couvrent complètement la plage souhaitée
-        const unavailableRanges = userUnavails.map(unavail => ({
-          start: parseInt(unavail.startTime.split(':')[0]),
-          end: parseInt(unavail.endTime.split(':')[0])
-        }));
-        
-        // Trier et fusionner les plages d'indisponibilité
-        unavailableRanges.sort((a, b) => a.start - b.start);
-        const mergedRanges = [];
-        for (const range of unavailableRanges) {
-          if (mergedRanges.length === 0 || mergedRanges[mergedRanges.length - 1].end < range.start) {
-            mergedRanges.push(range);
-          } else {
-            mergedRanges[mergedRanges.length - 1].end = Math.max(mergedRanges[mergedRanges.length - 1].end, range.end);
-          }
-        }
-        
-        // Vérifier si la plage souhaitée est complètement couverte par les indisponibilités
-        const isFullyCovered = mergedRanges.some(range => 
-          range.start <= preferredStartHour && range.end >= preferredEndHour
-        );
-        
-        if (isFullyCovered) {
-          anyParticipantFullyUnavailable = true;
-          break;
-        }
-      } else {
-        // Mode durée : vérifier si toute la journée est indisponible
-        const hasFullDayUnavailability = userUnavails.some(unavail => {
-          const startHour = parseInt(unavail.startTime.split(':')[0]);
-          const endHour = parseInt(unavail.endTime.split(':')[0]);
-          return startHour <= 0 && endHour >= 23;
-        });
-        
-        if (hasFullDayUnavailability) {
-          anyParticipantFullyUnavailable = true;
-          break;
-        }
-      }
+      
+      // Pas de vérification préalable pour exclure tout le jour
+      // La vérification des conflits se fera créneau par créneau dans findAvailableSlotsForDay
     }
 
-    if (anyParticipantFullyUnavailable) continue;
+    console.log(`✅ [SlotFinder] Jour ${dateStr} : recherche des créneaux disponibles`);
 
     // Trouver les créneaux communs pour cette date (en évitant les indisponibilités et événements)
     const commonSlots = findAvailableSlotsForDay(
@@ -135,6 +102,11 @@ export function findAvailableSlots(
     }
   }
 
+  console.log(`📊 [SlotFinder] Total créneaux trouvés: ${slots.length}`);
+  slots.forEach((slot, index) => {
+    console.log(`   ${index + 1}. ${slot.startDate.toISOString().split('T')[0]} ${slot.startDate.toTimeString().slice(0,5)}-${slot.endDate.toTimeString().slice(0,5)}`);
+  });
+  
   return slots.slice(0, 10); // Retourner les 10 premiers créneaux
 }
 
@@ -146,145 +118,67 @@ function findAvailableSlotsForDay(
   preferredEndTime?: Date,
   participantEvents?: { [userId: string]: Event[] }
 ): { start: Date; end: Date }[] {
-  const slots: { start: Date; end: Date }[] = [];
-  
-  // Utiliser les heures préférées si disponibles, sinon par défaut 9h-18h
-  const dayStart = new Date(date);
-  const dayEnd = new Date(date);
-  
-  if (preferredStartTime && preferredEndTime) {
-    dayStart.setHours(preferredStartTime.getHours(), preferredStartTime.getMinutes(), 0, 0);
-    dayEnd.setHours(preferredEndTime.getHours(), preferredEndTime.getMinutes(), 0, 0);
-  } else {
-    dayStart.setHours(9, 0, 0, 0);
-    dayEnd.setHours(18, 0, 0, 0);
+  // Si on n'a pas d'heures préférées, on ne peut pas vérifier
+  if (!preferredStartTime || !preferredEndTime) {
+    return [];
   }
   
-  // Collecter toutes les indisponibilités et événements de tous les participants
-  const allUnavailabilities: { start: Date; end: Date }[] = [];
+  const preferredStartMinutes = preferredStartTime.getHours() * 60 + preferredStartTime.getMinutes();
+  const preferredEndMinutes = preferredEndTime.getHours() * 60 + preferredEndTime.getMinutes();
+  const dateStr = date.toISOString().split('T')[0];
   
+  console.log(`🔍 [SlotFinder] Vérification créneau ${dateStr} ${preferredStartTime.getHours()}:${preferredStartTime.getMinutes().toString().padStart(2, '0')}-${preferredEndTime.getHours()}:${preferredEndTime.getMinutes().toString().padStart(2, '0')} (${preferredStartMinutes}-${preferredEndMinutes}min)`);
+  
+  // Vérifier pour chaque participant s'il y a conflit avec le créneau souhaité
   for (const userId of participants) {
     const userUnavails = participantUnavailabilities[userId] || [];
+    const userEvents = participantEvents?.[userId] || [];
     
-    // Ajouter les indisponibilités
+    // Vérifier les indisponibilités
     for (const unavail of userUnavails) {
       const [startHour, startMin] = unavail.startTime.split(':').map(Number);
       const [endHour, endMin] = unavail.endTime.split(':').map(Number);
+      const unavailStart = startHour * 60 + startMin;
+      const unavailEnd = endHour * 60 + endMin;
       
-      const unavailStart = new Date(date);
-      unavailStart.setHours(startHour, startMin);
-      const unavailEnd = new Date(date);
-      unavailEnd.setHours(endHour, endMin);
+      // Vérifier s'il y a chevauchement
+      const hasOverlap = unavailStart < preferredEndMinutes && unavailEnd > preferredStartMinutes;
       
-      allUnavailabilities.push({
-        start: unavailStart,
-        end: unavailEnd
-      });
+      if (hasOverlap) {
+        console.log(`❌ [SlotFinder] CONFLIT avec indisponibilité de ${userId}: ${unavailStart}-${unavailEnd}min vs ${preferredStartMinutes}-${preferredEndMinutes}min`);
+        return []; // Pas de créneau disponible
+      }
     }
     
-    // Ajouter les événements existants
-    const userEvents = participantEvents?.[userId] || [];
+    // Vérifier les événements existants
     for (const event of userEvents) {
       const [startHour, startMin] = event.startTime.split(':').map(Number);
       const [endHour, endMin] = event.endTime.split(':').map(Number);
+      const eventStart = startHour * 60 + startMin;
+      const eventEnd = endHour * 60 + endMin;
       
-      const eventStart = new Date(date);
-      eventStart.setHours(startHour, startMin);
-      const eventEnd = new Date(date);
-      eventEnd.setHours(endHour, endMin);
+      // Vérifier s'il y a chevauchement
+      const hasOverlap = eventStart < preferredEndMinutes && eventEnd > preferredStartMinutes;
       
-      allUnavailabilities.push({
-        start: eventStart,
-        end: eventEnd
-      });
-    }
-  }
-  
-  // Si aucune indisponibilité, le créneau entier est disponible
-  if (allUnavailabilities.length === 0) {
-    slots.push({
-      start: new Date(dayStart),
-      end: new Date(dayEnd)
-    });
-    return slots;
-  }
-  
-  // Trier les indisponibilités par heure de début
-  allUnavailabilities.sort((a, b) => a.start.getTime() - b.start.getTime());
-  
-  // Fusionner les indisponibilités qui se chevauchent
-  const mergedUnavailabilities: { start: Date; end: Date }[] = [];
-  for (const unavail of allUnavailabilities) {
-    if (mergedUnavailabilities.length === 0) {
-      mergedUnavailabilities.push(unavail);
-    } else {
-      const last = mergedUnavailabilities[mergedUnavailabilities.length - 1];
-      if (unavail.start <= last.end) {
-        // Fusionner
-        last.end = new Date(Math.max(last.end.getTime(), unavail.end.getTime()));
-      } else {
-        mergedUnavailabilities.push(unavail);
+      if (hasOverlap) {
+        console.log(`❌ [SlotFinder] CONFLIT avec événement "${event.title}" de ${userId}: ${eventStart}-${eventEnd}min vs ${preferredStartMinutes}-${preferredEndMinutes}min`);
+        return []; // Pas de créneau disponible
       }
     }
   }
   
-  // Créer les créneaux disponibles en évitant les indisponibilités
-  let currentTime = dayStart;
+  // Aucun conflit détecté, le créneau est disponible
+  console.log(`✅ [SlotFinder] Créneau ${dateStr} ${preferredStartMinutes}-${preferredEndMinutes}min DISPONIBLE`);
   
-  for (const unavail of mergedUnavailabilities) {
-    if (currentTime < unavail.start) {
-      // Il y a un créneau disponible avant cette indisponibilité
-      const slotStart = new Date(currentTime);
-      const slotEnd = new Date(unavail.start);
-      
-      // Si on a des heures préférées, vérifier si le créneau peut les contenir
-      if (preferredStartTime && preferredEndTime) {
-        const preferredStart = new Date(date);
-        preferredStart.setHours(preferredStartTime.getHours(), preferredStartTime.getMinutes());
-        const preferredEnd = new Date(date);
-        preferredEnd.setHours(preferredEndTime.getHours(), preferredEndTime.getMinutes());
-        
-        // Vérifier si le créneau disponible peut contenir l'horaire souhaité
-        if (slotStart <= preferredStart && slotEnd >= preferredEnd) {
-          slots.push({
-            start: preferredStart,
-            end: preferredEnd
-          });
-        }
-      } else {
-        slots.push({
-          start: slotStart,
-          end: slotEnd
-        });
-      }
-    }
-    currentTime = new Date(Math.max(currentTime.getTime(), unavail.end.getTime()));
-  }
+  const slotStart = new Date(date);
+  slotStart.setHours(preferredStartTime.getHours(), preferredStartTime.getMinutes(), 0, 0);
+  const slotEnd = new Date(date);
+  slotEnd.setHours(preferredEndTime.getHours(), preferredEndTime.getMinutes(), 0, 0);
   
-  // Ajouter le créneau final s'il reste du temps
-  if (currentTime < dayEnd) {
-    if (preferredStartTime && preferredEndTime) {
-      const preferredStart = new Date(date);
-      preferredStart.setHours(preferredStartTime.getHours(), preferredStartTime.getMinutes());
-      const preferredEnd = new Date(date);
-      preferredEnd.setHours(preferredEndTime.getHours(), preferredEndTime.getMinutes());
-      
-      // Vérifier si le créneau final peut contenir l'horaire souhaité
-      if (currentTime <= preferredStart && dayEnd >= preferredEnd) {
-        slots.push({
-          start: preferredStart,
-          end: preferredEnd
-        });
-      }
-    } else {
-      slots.push({
-        start: new Date(currentTime),
-        end: new Date(dayEnd)
-      });
-    }
-  }
-  
-  return slots;
+  return [{
+    start: slotStart,
+    end: slotEnd
+  }];
 }
 
 function canScheduleMultiDayEvent(

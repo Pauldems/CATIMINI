@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Alert,
   Platform,
   Modal,
+  Animated,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {
@@ -22,13 +23,19 @@ import {
   deleteDoc,
   onSnapshot,
 } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
-import { Friend, User, Availability, TimeSlot, Event } from '../types';
-import { findAvailableSlots } from '../utils/slotFinder';
-import { checkMultiParticipantConflicts, summarizeConflicts } from '../utils/conflictChecker';
-import notificationService from '../services/notificationService';
+import { auth, db } from '../../../config/firebase';
+import { Friend, User, Availability, TimeSlot, Event } from '../../../types';
+import { findAvailableSlots } from '../../../utils/slotFinder';
+import { checkMultiParticipantConflicts, summarizeConflicts } from '../../../utils/conflictChecker';
+import notificationService from '../../../services/notificationService';
+import GroupSelector from '../components/GroupSelector';
+import { useCurrentGroup } from '../../../hooks/useCurrentGroup';
+import GroupRequiredScreen from './GroupRequiredScreen';
+import { Colors } from '../../../theme/colors';
+
 
 export default function CreateEventScreen({ navigation }: any) {
+  const { currentGroup, loading: groupLoading, needsGroupSelection } = useCurrentGroup();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [startTime, setStartTime] = useState(() => {
@@ -54,94 +61,14 @@ export default function CreateEventScreen({ navigation }: any) {
   const [myEvents, setMyEvents] = useState<Event[]>([]);
   const [allEvents, setAllEvents] = useState<Event[]>([]);
   const [participantNames, setParticipantNames] = useState<{ [userId: string]: string }>({});
-
-  useEffect(() => {
-    loadFriends();
-    loadMyEvents();
-    loadAllEvents();
-    
-    // Réinitialiser les champs quand on revient sur cet écran
-    const unsubscribe = navigation.addListener('focus', () => {
-      resetForm();
-    });
-
-    return unsubscribe;
-  }, [navigation]);
-
-  const loadFriends = async () => {
-    if (!auth.currentUser) return;
-
-    try {
-      const friendsQuery = query(
-        collection(db, 'friends'),
-        where('userId', '==', auth.currentUser.uid),
-        where('status', '==', 'accepted')
-      );
-
-      const snapshot = await getDocs(friendsQuery);
-      const friendIds = snapshot.docs.map((doc) => doc.data().friendId);
-
-      const friendsData: User[] = [];
-      const names: { [userId: string]: string } = {};
-      
-      for (const friendId of friendIds) {
-        const userDoc = await getDoc(doc(db, 'users', friendId));
-        if (userDoc.exists()) {
-          const userData = userDoc.data() as User;
-          friendsData.push(userData);
-          names[friendId] = userData.displayName;
-        }
-      }
-
-      // Ajouter le nom de l'utilisateur actuel
-      if (auth.currentUser) {
-        const currentUserDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
-        if (currentUserDoc.exists()) {
-          names[auth.currentUser.uid] = currentUserDoc.data().displayName;
-        }
-      }
-
-      setFriends(friendsData);
-      setParticipantNames(names);
-    } catch (error) {
-      console.error('Error loading friends:', error);
-    }
-  };
-
-  const loadMyEvents = () => {
-    if (!auth.currentUser) return;
-
-    const eventsQuery = query(
-      collection(db, 'events'),
-      where('creatorId', '==', auth.currentUser.uid)
-    );
-
-    const unsubscribe = onSnapshot(eventsQuery, (snapshot) => {
-      const eventsData: Event[] = [];
-      snapshot.forEach((doc) => {
-        eventsData.push({ ...doc.data(), id: doc.id } as Event);
-      });
-      setMyEvents(eventsData);
-    });
-
-    return unsubscribe;
-  };
-
-  const loadAllEvents = () => {
-    if (!auth.currentUser) return;
-
-    const eventsQuery = query(collection(db, 'events'));
-
-    const unsubscribe = onSnapshot(eventsQuery, (snapshot) => {
-      const eventsData: Event[] = [];
-      snapshot.forEach((doc) => {
-        eventsData.push({ ...doc.data(), id: doc.id } as Event);
-      });
-      setAllEvents(eventsData);
-    });
-
-    return unsubscribe;
-  };
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [searchStartDate, setSearchStartDate] = useState(new Date());
+  const [showSearchDatePicker, setShowSearchDatePicker] = useState(false);
+  const [showDurationPicker, setShowDurationPicker] = useState(false);
+  
+  // Animations
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
 
   const resetForm = () => {
     setTitle('');
@@ -162,6 +89,128 @@ export default function CreateEventScreen({ navigation }: any) {
     setShowSlotSelector(false);
     setAvailableSlots([]);
     setSelectedSlot(null);
+    setSearchStartDate(new Date());
+  };
+
+  useEffect(() => {
+    if (currentGroup) {
+      loadFriends();
+      loadMyEvents();
+      loadAllEvents();
+    }
+    
+    // Réinitialiser les champs quand on revient sur cet écran
+    const unsubscribe = navigation.addListener('focus', () => {
+      resetForm();
+    });
+
+    return unsubscribe;
+  }, [navigation, currentGroup, refreshTrigger]);
+
+  // Animation d'entrée
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  // Si l'utilisateur n'a pas de groupe, afficher l'écran de sélection
+  if (needsGroupSelection) {
+    return (
+      <GroupRequiredScreen 
+        onGroupSelected={() => setRefreshTrigger(prev => prev + 1)}
+      />
+    );
+  }
+
+  if (groupLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Chargement...</Text>
+      </View>
+    );
+  }
+
+  const loadFriends = async () => {
+    if (!auth.currentUser || !currentGroup) return;
+
+    try {
+      const friendsData: User[] = [];
+      const names: { [userId: string]: string } = {};
+      
+      // Charger tous les membres du groupe sauf l'utilisateur actuel
+      for (const memberId of currentGroup.members) {
+        if (memberId !== auth.currentUser.uid) {
+          const userDoc = await getDoc(doc(db, 'users', memberId));
+          if (userDoc.exists()) {
+            const userData = userDoc.data() as User;
+            friendsData.push(userData);
+            names[memberId] = userData.displayName;
+          }
+        }
+      }
+
+      // Ajouter le nom de l'utilisateur actuel
+      if (auth.currentUser) {
+        const currentUserDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+        if (currentUserDoc.exists()) {
+          names[auth.currentUser.uid] = currentUserDoc.data().displayName;
+        }
+      }
+
+      setFriends(friendsData);
+      setParticipantNames(names);
+    } catch (error) {
+      console.error('Error loading friends:', error);
+    }
+  };
+
+  const loadMyEvents = () => {
+    if (!auth.currentUser || !currentGroup) return;
+
+    const eventsQuery = query(
+      collection(db, 'events'),
+      where('creatorId', '==', auth.currentUser.uid),
+      where('groupId', '==', currentGroup.id)
+    );
+
+    const unsubscribe = onSnapshot(eventsQuery, (snapshot) => {
+      const eventsData: Event[] = [];
+      snapshot.forEach((doc) => {
+        eventsData.push({ ...doc.data(), id: doc.id } as Event);
+      });
+      setMyEvents(eventsData);
+    });
+
+    return unsubscribe;
+  };
+
+  const loadAllEvents = () => {
+    if (!auth.currentUser || !currentGroup) return;
+
+    const eventsQuery = query(
+      collection(db, 'events'),
+      where('groupId', '==', currentGroup.id)
+    );
+
+    const unsubscribe = onSnapshot(eventsQuery, (snapshot) => {
+      const eventsData: Event[] = [];
+      snapshot.forEach((doc) => {
+        eventsData.push({ ...doc.data(), id: doc.id } as Event);
+      });
+      setAllEvents(eventsData);
+    });
+
+    return unsubscribe;
   };
 
   const toggleFriend = (friendId: string) => {
@@ -196,11 +245,17 @@ export default function CreateEventScreen({ navigation }: any) {
     }
 
     setLoading(true);
+    
+    // Attendre un délai plus long pour s'assurer que les données sont synchronisées
+    // Particulièrement important après la création d'un événement
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
     try {
       const participants = [...selectedFriends, auth.currentUser!.uid];
       const availabilities: { [userId: string]: Availability[] } = {};
 
-      // Charger les disponibilités de tous les participants
+      // Charger les disponibilités de tous les participants avec rechargement forcé
+      console.log('🔄 Rechargement des indisponibilités pour tous les participants...');
       for (const userId of participants) {
         const availQuery = query(
           collection(db, 'availabilities'),
@@ -212,17 +267,41 @@ export default function CreateEventScreen({ navigation }: any) {
           ...doc.data(),
           id: doc.id,
         } as Availability));
+        
+        // Debug détaillé des indisponibilités
+        const userUnavails = availabilities[userId].filter(a => !a.isAvailable);
+        const eventCreatedUnavails = userUnavails.filter(a => a.createdByEvent);
+        
+        console.log(`✅ Chargé ${availabilities[userId].length} disponibilités totales pour l'utilisateur ${userId}`);
+        console.log(`   - ${userUnavails.length} indisponibilités (isAvailable: false)`);
+        console.log(`   - ${eventCreatedUnavails.length} créées par des événements`);
+        
+        // Afficher quelques exemples d'indisponibilités
+        userUnavails.slice(0, 3).forEach((unavail, index) => {
+          console.log(`   [${index + 1}] ${unavail.date} ${unavail.startTime}-${unavail.endTime} ${unavail.createdByEvent ? `(événement: ${unavail.createdByEvent})` : '(manuelle)'}`);
+        });
       }
+      
+      // Recharger tous les événements du groupe pour s'assurer d'avoir les dernières données
+      console.log('🔄 Rechargement des événements du groupe...');
+      const eventsQuery = query(
+        collection(db, 'events'),
+        where('groupId', '==', currentGroup!.id)
+      );
+      const eventsSnapshot = await getDocs(eventsQuery);
+      const freshEvents: Event[] = eventsSnapshot.docs.map((doc) => ({
+        ...doc.data(),
+        id: doc.id,
+      } as Event));
+      
+      console.log(`✅ Chargé ${freshEvents.length} événements pour le groupe`);
 
       let durationInDays: number;
-      let searchStartDate: Date;
 
       if (searchMode === 'time') {
         durationInDays = 1;
-        searchStartDate = new Date();
       } else {
         durationInDays = parseInt(durationDays);
-        searchStartDate = new Date();
       }
       
       const slots = findAvailableSlots(
@@ -232,7 +311,7 @@ export default function CreateEventScreen({ navigation }: any) {
         searchStartDate,
         searchMode === 'time' ? startTime : undefined,
         searchMode === 'time' ? endTime : undefined,
-        allEvents
+        freshEvents // Utiliser les événements fraîchement chargés
       );
 
       if (slots.length === 0) {
@@ -242,6 +321,7 @@ export default function CreateEventScreen({ navigation }: any) {
         );
       } else {
         setAvailableSlots(slots);
+        setSelectedSlot(null); // Réinitialiser la sélection
         setShowSlotSelector(true);
       }
     } catch (error: any) {
@@ -251,42 +331,65 @@ export default function CreateEventScreen({ navigation }: any) {
     }
   };
 
+
+  const createUnavailabilityForParticipants = async (participants: string[], startDate: Date, endDate: Date, startTime: string, endTime: string, eventId: string) => {
+    const promises = participants.map(async (participantId) => {
+      const currentDate = new Date(startDate);
+      while (currentDate <= endDate) {
+        const dateStr = currentDate.toISOString().split('T')[0];
+        
+        await addDoc(collection(db, 'availabilities'), {
+          userId: participantId,
+          date: dateStr,
+          startTime: startTime,
+          endTime: endTime,
+          isAvailable: false,
+          createdAt: new Date(),
+          createdByEvent: eventId, // Lier l'indisponibilité à l'événement
+          groupId: currentGroup?.id, // Ajouter le groupId pour la cohérence
+        });
+        
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+    });
+    
+    await Promise.all(promises);
+  };
+
+  const deleteUnavailabilitiesForEvent = async (eventId: string) => {
+    // Supprimer toutes les indisponibilités créées par cet événement
+    const availabilitiesQuery = query(
+      collection(db, 'availabilities'),
+      where('createdByEvent', '==', eventId)
+    );
+    
+    const snapshot = await getDocs(availabilitiesQuery);
+    const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
+    
+    await Promise.all(deletePromises);
+  };
+
   const createEvent = async () => {
     if (!selectedSlot) {
       Alert.alert('Erreur', 'Veuillez sélectionner un créneau');
       return;
     }
 
-    // Vérifier les conflits avant la création
+    // Créer l'événement et les indisponibilités pour tous les participants
     const participants = [...selectedFriends, auth.currentUser!.uid];
     const startTime = selectedSlot.startDate.toTimeString().slice(0, 5);
     const endTime = selectedSlot.endDate.toTimeString().slice(0, 5);
 
-    const conflictResults = checkMultiParticipantConflicts(
-      participants,
-      selectedSlot.startDate,
-      selectedSlot.endDate,
-      startTime,
-      endTime,
-      allEvents
-    );
+    // Créer des dates locales
+    const startDateLocal = new Date(selectedSlot.startDate);
+    const endDateLocal = new Date(selectedSlot.endDate);
 
-    const conflictSummary = summarizeConflicts(conflictResults, participantNames);
-
-    if (conflictSummary.hasAnyConflict) {
-      Alert.alert(
-        'Conflit détecté',
-        `${conflictSummary.conflictingSummary}\n\nVoulez-vous créer l'événement quand même ?`,
-        [
-          { text: 'Annuler', style: 'cancel' },
-          { text: 'Créer quand même', onPress: () => proceedWithEventCreation() }
-        ]
-      );
-      return;
+    try {
+      // Créer l'événement d'abord pour obtenir son ID
+      await proceedWithEventCreation();
+    } catch (error: any) {
+      Alert.alert('Erreur', error.message);
     }
-
-    // Pas de conflit, créer l'événement directement
-    await proceedWithEventCreation();
   };
 
   const proceedWithEventCreation = async () => {
@@ -305,8 +408,19 @@ export default function CreateEventScreen({ navigation }: any) {
         duration: Math.max(1, Math.ceil((selectedSlot.endDate.getTime() - selectedSlot.startDate.getTime()) / (1000 * 60 * 60 * 24))),
         participants: [...selectedFriends, auth.currentUser!.uid],
         confirmedParticipants: [auth.currentUser!.uid],
+        groupId: currentGroup!.id,
         createdAt: new Date(),
       });
+
+
+      // Créer les indisponibilités pour tous les participants
+      const participants = [...selectedFriends, auth.currentUser!.uid];
+      const startDateLocal = new Date(selectedSlot.startDate);
+      const endDateLocal = new Date(selectedSlot.endDate);
+      const startTime = selectedSlot.startDate.toTimeString().slice(0, 5);
+      const endTime = selectedSlot.endDate.toTimeString().slice(0, 5);
+      
+      await createUnavailabilityForParticipants(participants, startDateLocal, endDateLocal, startTime, endTime, eventDoc.id);
 
       // Envoyer des notifications aux participants
       console.log('Envoi de notifications aux participants:', selectedFriends);
@@ -329,6 +443,13 @@ export default function CreateEventScreen({ navigation }: any) {
       setShowSlotSelector(false);
       setSelectedSlot(null);
       resetForm();
+      // Forcer le rechargement des événements
+      setRefreshTrigger(prev => prev + 1);
+      
+      // Attendre un peu pour que les indisponibilités soient bien propagées
+      setTimeout(() => {
+        console.log('Indisponibilités créées et propagées');
+      }, 1000);
     } catch (error: any) {
       Alert.alert('Erreur', error.message);
     } finally {
@@ -359,6 +480,9 @@ export default function CreateEventScreen({ navigation }: any) {
               // Supprimer l'événement
               await deleteDoc(doc(db, 'events', eventId));
               
+              // Supprimer les indisponibilités créées par cet événement
+              await deleteUnavailabilitiesForEvent(eventId);
+              
               // Envoyer des notifications aux participants (sauf le créateur)
               const otherParticipants = eventData.participants.filter(id => id !== auth.currentUser!.uid);
               if (otherParticipants.length > 0) {
@@ -379,7 +503,16 @@ export default function CreateEventScreen({ navigation }: any) {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <Animated.View 
+      style={[
+        styles.container, 
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        }
+      ]}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContent}>
       <Text style={styles.title}>Créer un événement</Text>
 
       <View style={styles.form}>
@@ -451,14 +584,15 @@ export default function CreateEventScreen({ navigation }: any) {
         ) : (
           <View style={styles.dateTimeSection}>
             <Text style={styles.sectionTitle}>Durée souhaitée</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Nombre de jours"
-              placeholderTextColor="#999"
-              value={durationDays}
-              onChangeText={setDurationDays}
-              keyboardType="numeric"
-            />
+            <TouchableOpacity
+              style={styles.durationSelector}
+              onPress={() => setShowDurationPicker(true)}
+            >
+              <Text style={styles.durationSelectorText}>
+                {durationDays ? `${durationDays} jour${parseInt(durationDays) > 1 ? 's' : ''}` : 'Sélectionner la durée'}
+              </Text>
+              <Text style={styles.durationSelectorIcon}>⌄</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -486,14 +620,36 @@ export default function CreateEventScreen({ navigation }: any) {
           ))}
         </View>
 
+        {/* Sélecteur de date de début de recherche */}
+        <View style={styles.searchDateSection}>
+          <Text style={styles.sectionTitle}>Rechercher à partir du :</Text>
+          <TouchableOpacity
+            style={styles.dateButton}
+            onPress={() => setShowSearchDatePicker(true)}
+          >
+            <Text style={styles.dateButtonText}>
+              {searchStartDate.toLocaleDateString('fr-FR', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+              })}
+            </Text>
+            <Text style={styles.dateButtonHint}>Toucher pour changer</Text>
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
+          style={[styles.searchButton, loading && styles.buttonDisabled]}
           onPress={searchSlots}
           disabled={loading}
         >
-          <Text style={styles.buttonText}>
-            {loading ? 'Recherche...' : 'Rechercher des créneaux'}
-          </Text>
+          <View style={styles.searchButtonContent}>
+            <Text style={styles.searchButtonIcon}>🔍</Text>
+            <Text style={styles.searchButtonText}>
+              {loading ? 'Actualisation des données...' : 'Rechercher des créneaux'}
+            </Text>
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -505,12 +661,29 @@ export default function CreateEventScreen({ navigation }: any) {
         ) : (
           <View style={styles.eventsList}>
             {myEvents.map((event) => (
-              <View key={event.id} style={styles.eventItem}>
+              <TouchableOpacity 
+                key={event.id} 
+                style={styles.eventItem}
+                onPress={() => {
+                  const friendsFormatted = friends.map(friend => ({
+                    id: friend.id,
+                    userId: auth.currentUser!.uid,
+                    friendId: friend.id,
+                    status: 'accepted' as const,
+                    createdAt: friend.createdAt,
+                    friendData: friend
+                  }));
+                  navigation.navigate('EditEvent', { event, friends: friendsFormatted });
+                }}
+              >
                 <View style={styles.eventHeader}>
                   <Text style={styles.eventTitle}>{event.title}</Text>
                   <TouchableOpacity
                     style={styles.deleteButton}
-                    onPress={() => deleteEvent(event.id)}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      deleteEvent(event.id);
+                    }}
                   >
                     <Text style={styles.deleteButtonText}>✕</Text>
                   </TouchableOpacity>
@@ -539,7 +712,7 @@ export default function CreateEventScreen({ navigation }: any) {
                 {event.description && (
                   <Text style={styles.eventDescription}>{event.description}</Text>
                 )}
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         )}
@@ -557,7 +730,7 @@ export default function CreateEventScreen({ navigation }: any) {
               is24Hour={true}
               display="spinner"
               textColor="#000000"
-              accentColor="#007AFF"
+              accentColor={Colors.primary}
               onChange={(event, time) => {
                 if (time) setStartTime(time);
               }}
@@ -583,7 +756,7 @@ export default function CreateEventScreen({ navigation }: any) {
               is24Hour={true}
               display="spinner"
               textColor="#000000"
-              accentColor="#007AFF"
+              accentColor={Colors.primary}
               onChange={(event, time) => {
                 if (time) setEndTime(time);
               }}
@@ -592,6 +765,33 @@ export default function CreateEventScreen({ navigation }: any) {
             <TouchableOpacity
               style={styles.modalButton}
               onPress={() => setShowEndTime(false)}
+            >
+              <Text style={styles.modalButtonText}>Confirmer</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal pour la date de début de recherche */}
+      <Modal visible={showSearchDatePicker} transparent={true} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Date de début de recherche</Text>
+            <DateTimePicker
+              value={searchStartDate}
+              mode="date"
+              display="spinner"
+              textColor="#000000"
+              accentColor={Colors.primary}
+              minimumDate={new Date()}
+              onChange={(event, date) => {
+                if (date) setSearchStartDate(date);
+              }}
+              style={styles.picker}
+            />
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => setShowSearchDatePicker(false)}
             >
               <Text style={styles.modalButtonText}>Confirmer</Text>
             </TouchableOpacity>
@@ -662,19 +862,77 @@ export default function CreateEventScreen({ navigation }: any) {
         </View>
       </Modal>
 
-    </ScrollView>
+      {/* Modal de sélection de la durée */}
+      <Modal
+        visible={showDurationPicker}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowDurationPicker(false)}
+      >
+        <View style={styles.slotModalOverlay}>
+          <View style={styles.durationModalContainer}>
+            <View style={styles.slotModalHeader}>
+              <Text style={styles.slotModalTitle}>Durée en jours</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setShowDurationPicker(false)}
+              >
+                <Text style={styles.closeButtonText}>×</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.durationList}>
+              {[1, 2, 3, 4, 5, 6, 7, 10, 14, 21, 30].map((days) => (
+                <TouchableOpacity
+                  key={days}
+                  style={[
+                    styles.durationItem,
+                    durationDays === days.toString() && styles.selectedDurationItem
+                  ]}
+                  onPress={() => {
+                    setDurationDays(days.toString());
+                    setShowDurationPicker(false);
+                  }}
+                >
+                  <Text style={[
+                    styles.durationItemText,
+                    durationDays === days.toString() && styles.selectedDurationText
+                  ]}>
+                    {days} jour{days > 1 ? 's' : ''}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      </ScrollView>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.primary,
+  },
+  scrollContent: {
+    paddingBottom: 140,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: Colors.white,
   },
   title: {
     fontSize: 26,
     fontWeight: '300',
-    color: '#000',
+    color: Colors.white,
     padding: 18,
     paddingTop: 80,
     paddingBottom: 12,
@@ -684,12 +942,14 @@ const styles = StyleSheet.create({
   },
   input: {
     height: 48,
-    backgroundColor: '#F5F5F7',
+    backgroundColor: Colors.white,
     borderRadius: 10,
     paddingHorizontal: 16,
     fontSize: 15,
     marginBottom: 14,
-    color: '#000',
+    color: Colors.textPrimary,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   textArea: {
     height: 80,
@@ -699,7 +959,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#000',
+    color: Colors.white,
     marginBottom: 14,
     marginTop: 6,
   },
@@ -711,31 +971,64 @@ const styles = StyleSheet.create({
   friendItem: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: '#F5F5F7',
+    backgroundColor: Colors.white,
     borderRadius: 16,
     marginRight: 6,
     marginBottom: 6,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   selectedFriend: {
-    backgroundColor: '#007AFF',
+    backgroundColor: Colors.secondary,
+    borderColor: Colors.secondary,
   },
   friendName: {
     fontSize: 15,
-    color: '#000',
+    color: Colors.textPrimary,
   },
   selectedFriendText: {
-    color: '#FFF',
+    color: Colors.white,
   },
   button: {
     height: 48,
-    backgroundColor: '#000',
+    backgroundColor: Colors.primary,
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
   },
+  searchButton: {
+    height: 56,
+    backgroundColor: Colors.primary,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  searchButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchButtonIcon: {
+    fontSize: 18,
+    marginRight: 8,
+  },
+  searchButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   createButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: Colors.secondary,
     marginTop: 16,
   },
   buttonDisabled: {
@@ -749,7 +1042,7 @@ const styles = StyleSheet.create({
   selectedSlot: {
     backgroundColor: '#E3F2FD',
     borderWidth: 2,
-    borderColor: '#007AFF',
+    borderColor: Colors.primary,
   },
   dateTimeSection: {
     marginBottom: 24,
@@ -761,12 +1054,12 @@ const styles = StyleSheet.create({
   },
   dateTimeButton: {
     flex: 1,
-    backgroundColor: '#F5F5F7',
+    backgroundColor: Colors.primarySoft,
     padding: 16,
     borderRadius: 10,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E1E1E6',
+    borderColor: Colors.primary,
   },
   dateTimeLabel: {
     fontSize: 14,
@@ -804,7 +1097,7 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   modalButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: Colors.primary,
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
@@ -850,7 +1143,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#F5F5F7',
+    backgroundColor: Colors.primarySoft,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -864,7 +1157,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   slotItem: {
-    backgroundColor: '#F5F5F7',
+    backgroundColor: Colors.primarySoft,
     padding: 16,
     borderRadius: 12,
     marginVertical: 6,
@@ -872,7 +1165,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   selectedSlotItem: {
-    backgroundColor: '#007AFF',
+    backgroundColor: Colors.primary,
     borderColor: '#0056CC',
   },
   slotDate: {
@@ -894,7 +1187,7 @@ const styles = StyleSheet.create({
     color: 'white',
   },
   createEventButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: Colors.secondary,
     marginHorizontal: 20,
     marginTop: 16,
   },
@@ -909,15 +1202,15 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: '#F5F5F7',
+    backgroundColor: Colors.white,
     borderRadius: 10,
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: Colors.border,
   },
   selectedModeButton: {
-    backgroundColor: '#007AFF',
-    borderColor: '#0056CC',
+    backgroundColor: Colors.secondary,
+    borderColor: Colors.secondary,
   },
   modeButtonText: {
     fontSize: 14,
@@ -925,11 +1218,62 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   selectedModeButtonText: {
+    color: Colors.primary,
+  },
+  durationSelector: {
+    height: 48,
+    backgroundColor: Colors.white,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  durationSelectorText: {
+    fontSize: 15,
+    color: '#333',
+  },
+  durationSelectorIcon: {
+    fontSize: 16,
+    color: '#666',
+  },
+  durationModalContainer: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '60%',
+    paddingBottom: 20,
+  },
+  durationList: {
+    maxHeight: 300,
+    paddingHorizontal: 20,
+  },
+  durationItem: {
+    backgroundColor: Colors.primarySoft,
+    padding: 16,
+    borderRadius: 12,
+    marginVertical: 4,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  selectedDurationItem: {
+    backgroundColor: Colors.primary,
+    borderColor: '#0056CC',
+  },
+  durationItemText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000',
+    textAlign: 'center',
+  },
+  selectedDurationText: {
     color: 'white',
   },
   myEventsSection: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 140,
   },
   noEventsText: {
     fontSize: 14,
@@ -942,12 +1286,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   eventItem: {
-    backgroundColor: '#F5F5F7',
+    backgroundColor: Colors.primarySoft,
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E1E1E6',
+    borderColor: Colors.primary,
   },
   eventHeader: {
     flexDirection: 'row',
@@ -977,13 +1321,13 @@ const styles = StyleSheet.create({
   },
   eventDate: {
     fontSize: 14,
-    color: '#007AFF',
+    color: Colors.primary,
     fontWeight: '500',
     marginBottom: 4,
   },
   eventTime: {
     fontSize: 14,
-    color: '#4CAF50',
+    color: Colors.secondary,
     fontWeight: '500',
     marginBottom: 4,
   },
@@ -996,6 +1340,29 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#666',
     fontStyle: 'italic',
+    marginTop: 4,
+  },
+  searchDateSection: {
+    marginBottom: 16,
+  },
+  dateButton: {
+    backgroundColor: Colors.primarySoft,
+    padding: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    marginTop: 8,
+  },
+  dateButtonText: {
+    fontSize: 16,
+    color: '#000',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  dateButtonHint: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
     marginTop: 4,
   },
 });

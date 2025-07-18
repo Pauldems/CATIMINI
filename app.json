@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "CatiminiApp",
-    "slug": "CatiminiApp",
-    "version": "1.0.0",
+    "name": "Créno",
+    "slug": "catimini-app",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -13,17 +13,61 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.catimini.app",
+      "buildNumber": "39",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": [
+          "remote-notification"
+        ],
+        "NSUserNotificationsUsageDescription": "Créno utilise les notifications pour vous informer des nouveaux événements, invitations de groupe et rappels d'événements auxquels vous participez.",
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
+          }
+        ]
+      },
+      "entitlements": {
+        "aps-environment": "production"
+      }
     },
     "android": {
+      "versionCode": 39,
+      "package": "com.catimini.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "WAKE_LOCK"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#ffffff",
+          "defaultChannel": "default",
+          "mode": "production"
+        }
+      ]
+    ],
+    "owner": "pablo1367",
+    "extra": {
+      "eas": {
+        "projectId": "e12fe417-6270-48c6-b2f1-444535f037cb"
+      }
     }
   }
 }

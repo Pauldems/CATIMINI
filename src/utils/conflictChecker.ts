@@ -26,6 +26,11 @@ export function checkEventConflicts(
     event.id !== excludeEventId
   );
 
+  console.log(`🔍 [${userId}] TOTAL événements dans la base:`, existingEvents.length);
+  console.log(`🔍 [${userId}] Événements où je participe:`, userEvents.length);
+  console.log(`🔍 [${userId}] Détail des événements où je participe:`, userEvents.map(e => `${e.title} (${e.startDate} ${e.startTime}-${e.endTime})`));
+  console.log(`🔍 [${userId}] Créneau recherché: ${startDate.toISOString().split('T')[0]} ${startTime}-${endTime}`);
+
   // Convertir les heures en minutes pour faciliter les comparaisons
   const [startHour, startMin] = startTime.split(':').map(Number);
   const [endHour, endMin] = endTime.split(':').map(Number);
@@ -33,22 +38,41 @@ export function checkEventConflicts(
   const newEventEndMinutes = endHour * 60 + endMin;
 
   for (const event of userEvents) {
-    const eventStartDate = new Date(event.startDate);
-    const eventEndDate = new Date(event.endDate);
+    console.log(`🔍 [${userId}] Vérification événement: ${event.title} (${event.startDate} ${event.startTime}-${event.endTime})`);
     
-    // Vérifier si les dates se chevauchent
-    if (startDate <= eventEndDate && endDate >= eventStartDate) {
+    // Comparer les dates string directement (format YYYY-MM-DD)
+    const newStartDateStr = startDate.toISOString().split('T')[0];
+    const newEndDateStr = endDate.toISOString().split('T')[0];
+    
+    console.log(`🔍 [${userId}] Dates nouvel événement: ${newStartDateStr} à ${newEndDateStr}`);
+    console.log(`🔍 [${userId}] Dates événement existant: ${event.startDate} à ${event.endDate}`);
+    
+    // Vérifier si les dates se chevauchent (comparaison string)
+    const datesOverlap = newStartDateStr <= event.endDate && newEndDateStr >= event.startDate;
+    console.log(`🔍 [${userId}] Comparaison: ${newStartDateStr} <= ${event.endDate} && ${newEndDateStr} >= ${event.startDate} = ${datesOverlap}`);
+    
+    if (datesOverlap) {
+      console.log(`🔍 [${userId}] ✅ Dates se chevauchent`);
+      
       // Les dates se chevauchent, vérifier les heures
       const [eventStartHour, eventStartMin] = event.startTime.split(':').map(Number);
       const [eventEndHour, eventEndMin] = event.endTime.split(':').map(Number);
       const existingEventStartMinutes = eventStartHour * 60 + eventStartMin;
       const existingEventEndMinutes = eventEndHour * 60 + eventEndMin;
       
+      console.log(`🔍 [${userId}] Heures nouvel événement: ${newEventStartMinutes}-${newEventEndMinutes}min`);
+      console.log(`🔍 [${userId}] Heures événement existant: ${existingEventStartMinutes}-${existingEventEndMinutes}min`);
+      
       // Vérifier si les heures se chevauchent
       if (newEventStartMinutes < existingEventEndMinutes && 
           newEventEndMinutes > existingEventStartMinutes) {
+        console.log(`🔍 [${userId}] ⚠️ CONFLIT DÉTECTÉ !`);
         conflictingEvents.push(event);
+      } else {
+        console.log(`🔍 [${userId}] ✅ Pas de conflit d'heures`);
       }
+    } else {
+      console.log(`🔍 [${userId}] ❌ Dates ne se chevauchent pas`);
     }
   }
 
