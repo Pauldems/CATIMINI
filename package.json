@@ -1,0 +1,22 @@
+{
+  "devDependencies": {
+    "@react-native-community/cli": "^19.1.0"
+  },
+  "dependencies": {
+    "@react-navigation/bottom-tabs": "^7.4.2",
+    "@react-navigation/native": "^7.1.14",
+    "@react-navigation/stack": "^7.4.2",
+    "expo": "^53.0.19",
+    "react": "19.0.0",
+    "react-native": "0.79.5",
+    "react-native-gesture-handler": "^2.27.1",
+    "react-native-reanimated": "^3.18.0",
+    "react-native-screens": "^4.11.1"
+  },
+  "name": "CATIMINI",
+  "version": "1.0.0",
+  "scripts": {
+    "android": "expo run:android",
+    "ios": "expo run:ios"
+  }
+}
