@@ -9,7 +9,7 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { auth } from '../../../config/firebase';
 import { Colors } from '../../../theme/colors';
 
@@ -26,7 +26,38 @@ export default function LoginScreen({ navigation }: any) {
 
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      // Vérifier si l'email est vérifié
+      if (!user.emailVerified) {
+        Alert.alert(
+          'Email non vérifié',
+          'Vous devez vérifier votre email avant de vous connecter. Voulez-vous renvoyer l\'email de vérification ?',
+          [
+            { text: 'Annuler', style: 'cancel' },
+            { 
+              text: 'Renvoyer', 
+              onPress: async () => {
+                try {
+                  await sendEmailVerification(user);
+                  Alert.alert('Email envoyé', 'Un nouvel email de vérification a été envoyé.');
+                } catch (error) {
+                  Alert.alert('Erreur', 'Impossible d\'envoyer l\'email de vérification.');
+                }
+              }
+            }
+          ]
+        );
+        
+        // Déconnecter l'utilisateur
+        await auth.signOut();
+        return;
+      }
+      
+      // Email vérifié, connexion réussie
+      console.log('Connexion réussie, email vérifié');
+      
     } catch (error: any) {
       Alert.alert('Erreur', error.message);
     } finally {
@@ -90,7 +121,7 @@ export default function LoginScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.primary,
+    backgroundColor: '#FAFAFA',
   },
   content: {
     flex: 1,
@@ -98,54 +129,79 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   title: {
-    fontSize: 40,
-    fontWeight: '300',
-    color: Colors.white,
+    fontSize: 48,
+    fontWeight: '800',
+    color: '#1A3B5C',
     textAlign: 'center',
     marginBottom: 8,
+    letterSpacing: 1,
   },
   subtitle: {
-    fontSize: 16,
-    color: Colors.white,
+    fontSize: 18,
+    color: '#FFB800',
     textAlign: 'center',
-    marginBottom: 40,
+    marginBottom: 50,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   form: {
     width: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 28,
+    padding: 24,
+    shadowColor: '#1A3B5C',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 15,
+    backdropFilter: 'blur(10px)',
   },
   input: {
-    height: 50,
-    backgroundColor: Colors.gray100,
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    fontSize: 15,
-    marginBottom: 14,
-    color: Colors.textPrimary,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    height: 56,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 18,
+    paddingHorizontal: 20,
+    fontSize: 16,
+    marginBottom: 18,
+    color: '#1A3B5C',
+    borderWidth: 0,
+    shadowColor: '#1A3B5C',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+    fontWeight: '500',
   },
   button: {
-    height: 50,
-    backgroundColor: Colors.secondary,
-    borderRadius: 10,
+    height: 56,
+    backgroundColor: '#1A3B5C',
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 16,
+    shadowColor: '#1A3B5C',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
   },
   buttonDisabled: {
     opacity: 0.5,
   },
   buttonText: {
-    color: Colors.white,
-    fontSize: 15,
-    fontWeight: '600',
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   linkButton: {
-    marginTop: 20,
+    marginTop: 24,
     alignItems: 'center',
   },
   linkText: {
-    color: Colors.white,
-    fontSize: 15,
+    color: '#1A3B5C',
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
 });

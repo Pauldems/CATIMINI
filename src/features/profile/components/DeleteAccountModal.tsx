@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, Modal, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { deleteUser } from 'firebase/auth';
+import { deleteUser, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { collection, query, where, getDocs, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../../../config/firebase';
 
@@ -17,6 +17,8 @@ export const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({
   onAccountDeleted
 }) => {
   const [loading, setLoading] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [password, setPassword] = useState('');
 
   const deleteUserData = async (userId: string) => {
     const collections = [
@@ -122,10 +124,20 @@ export const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({
               onAccountDeleted();
             } catch (error: any) {
               console.error('Erreur suppression compte:', error);
-              Alert.alert(
-                'Erreur',
-                'Une erreur est survenue lors de la suppression de votre compte. Veuillez réessayer.'
-              );
+              
+              if (error.code === 'auth/requires-recent-login') {
+                console.log('🔐 Ouverture modal mot de passe');
+                setLoading(false);
+                onClose(); // Fermer la première modal
+                setTimeout(() => {
+                  setShowPasswordModal(true);
+                }, 300);
+              } else {
+                Alert.alert(
+                  'Erreur',
+                  'Une erreur est survenue lors de la suppression de votre compte. Veuillez réessayer.'
+                );
+              }
             } finally {
               setLoading(false);
             }
@@ -135,7 +147,41 @@ export const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({
     );
   };
 
+  const handleReauthAndDelete = async () => {
+    if (!auth.currentUser || !auth.currentUser.email) return;
+    
+    setLoading(true);
+    try {
+      // Réauthentifier l'utilisateur
+      const credential = EmailAuthProvider.credential(
+        auth.currentUser.email,
+        password
+      );
+      await reauthenticateWithCredential(auth.currentUser, credential);
+      
+      // Maintenant on peut supprimer
+      const userId = auth.currentUser.uid;
+      await deleteUserData(userId);
+      await deleteUser(auth.currentUser);
+      
+      setShowPasswordModal(false);
+      onAccountDeleted();
+    } catch (error: any) {
+      console.error('Erreur réauth:', error);
+      Alert.alert(
+        'Erreur',
+        error.code === 'auth/wrong-password' 
+          ? 'Mot de passe incorrect' 
+          : 'Erreur lors de la suppression du compte'
+      );
+    } finally {
+      setLoading(false);
+      setPassword('');
+    }
+  };
+
   return (
+    <>
     <Modal
       visible={visible}
       transparent
@@ -192,6 +238,58 @@ export const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({
         </View>
       </View>
     </Modal>
+
+    {/* Modal pour le mot de passe */}
+    <Modal
+      visible={showPasswordModal}
+      transparent
+      animationType="slide"
+      statusBarTranslucent
+    >
+      <View style={styles.overlay}>
+        <View style={styles.modal}>
+          <Text style={styles.title}>Confirmation requise</Text>
+          <Text style={styles.description}>
+            Pour supprimer votre compte, veuillez entrer votre mot de passe
+          </Text>
+          
+          <TextInput
+            style={styles.input}
+            placeholder="Mot de passe"
+            placeholderTextColor="#999"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoCapitalize="none"
+          />
+          
+          <View style={[styles.buttonContainer, { flexDirection: 'row' }]}>
+            <TouchableOpacity
+              style={[styles.button, styles.cancelButton]}
+              onPress={() => {
+                setShowPasswordModal(false);
+                setPassword('');
+              }}
+            >
+              <Text style={styles.cancelButtonText}>Annuler</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.button, styles.deleteButton]}
+              onPress={handleReauthAndDelete}
+              disabled={loading || !password}
+            >
+              {loading ? (
+                <ActivityIndicator color="white" size="small" />
+              ) : (
+                <Text style={styles.deleteButtonText}>Confirmer</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+    </>
   );
 };
 
@@ -284,5 +382,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: 'white',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 16,
+    fontSize: 16,
+    color: '#1A3B5C',
+    marginBottom: 24,
+    backgroundColor: '#f5f5f5',
   },
 });

@@ -69,7 +69,7 @@ export function findAvailableSlots(
     for (const slot of commonSlots) {
       const slotDuration = (slot.end.getTime() - slot.start.getTime()) / (1000 * 60 * 60);
       
-      if (slotDuration >= duration / 24) { // duration est en jours
+      if (duration > 1 || slotDuration >= duration) { // duration > 1 = multi-jours, sinon duration en heures
         // Si l'événement dure plusieurs jours, vérifier les jours suivants
         if (duration > 1) {
           const endDate = new Date(date);
@@ -118,9 +118,14 @@ function findAvailableSlotsForDay(
   preferredEndTime?: Date,
   participantEvents?: { [userId: string]: Event[] }
 ): { start: Date; end: Date }[] {
-  // Si on n'a pas d'heures préférées, on ne peut pas vérifier
+  // Si on n'a pas d'heures préférées, utiliser toute la journée (00h00-23h59)
   if (!preferredStartTime || !preferredEndTime) {
-    return [];
+    const defaultStart = new Date(date);
+    defaultStart.setHours(0, 0, 0, 0);
+    const defaultEnd = new Date(date);
+    defaultEnd.setHours(23, 59, 59, 999);
+    preferredStartTime = defaultStart;
+    preferredEndTime = defaultEnd;
   }
   
   const preferredStartMinutes = preferredStartTime.getHours() * 60 + preferredStartTime.getMinutes();

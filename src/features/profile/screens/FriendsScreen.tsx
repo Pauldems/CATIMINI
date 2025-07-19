@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import {
   collection,
   query,
@@ -31,22 +32,36 @@ export default function FriendsScreen({ navigation }: any) {
   const [events, setEvents] = useState<Event[]>([]);
   const [markedDates, setMarkedDates] = useState<any>({});
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [showTooltip, setShowTooltip] = useState(false);
 
   // Listener pour remettre la page en haut quand on arrive sur l'écran
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+      // Réinitialiser les dates marquées pour forcer un affichage propre
+      setMarkedDates({});
       // Rafraîchir les données quand on revient sur l'onglet
       setRefreshTrigger(prev => prev + 1);
+      // Fermer le tooltip
+      setShowTooltip(false);
     });
     return unsubscribe;
   }, [navigation]);
 
   useEffect(() => {
     if (currentGroup) {
+      // Réinitialiser avant de recharger
+      setMarkedDates({});
+      setEvents([]);
+      
       loadFriends();
       loadAllAvailabilities();
-      loadEvents();
+      // Charger les événements avec un léger délai pour s'assurer que tout est prêt
+      const timer = setTimeout(() => {
+        loadEvents();
+      }, 200);
+      
+      return () => clearTimeout(timer);
     }
   }, [currentGroup, refreshTrigger]);
 
@@ -128,16 +143,16 @@ export default function FriendsScreen({ navigation }: any) {
           if (!marked[date]) {
             marked[date] = {
               marked: true,
-              dotColor: Colors.secondary,
+              dotColor: '#1A3B5C',
               customStyles: {
                 container: {
-                  backgroundColor: Colors.unavailable,
+                  backgroundColor: '#1A3B5C',
                   borderRadius: 25,
                   width: 35,
                   height: 35,
                 },
                 text: {
-                  color: Colors.white,
+                  color: '#FFFFFF',
                   fontWeight: '600',
                   fontSize: 14
                 }
@@ -203,16 +218,16 @@ export default function FriendsScreen({ navigation }: any) {
         }
         
         // Si cette date était indisponible avec bordure d'événement, enlever la bordure
-        if (!hasEvent && newMarked[date] && newMarked[date].customStyles?.container?.borderColor === Colors.secondary) {
+        if (!hasEvent && newMarked[date] && newMarked[date].customStyles?.container?.borderColor === '#FFB800') {
           newMarked[date].customStyles = {
             container: {
-              backgroundColor: Colors.unavailable,
+              backgroundColor: '#1A3B5C',
               borderRadius: 25,
               width: 35,
               height: 35,
             },
             text: {
-              color: Colors.white,
+              color: '#FFFFFF',
               fontWeight: '600'
             }
           };
@@ -229,34 +244,24 @@ export default function FriendsScreen({ navigation }: any) {
           const dateStr = date.toISOString().split('T')[0];
           
           if (!newMarked[dateStr]) {
-            // Date vide - ajouter cercle jaune
+            // Date vide - ajouter cercle jaune avec point jaune
             newMarked[dateStr] = {
               marked: true,
-              dotColor: Colors.secondary,
-              customStyles: {
-                container: {
-                  backgroundColor: 'transparent',
-                  borderRadius: 25,
-                  borderWidth: 2,
-                  borderColor: Colors.secondary,
-                  width: 35,
-                  height: 35,
-                },
-                text: {
-                  color: Colors.white,
-                  fontWeight: '600',
-                  fontSize: 14
-                }
-              }
+              dotColor: '#FFB800',
             };
           } else {
-            // Date avec indisponibilité - ajouter bordure jaune en plus
-            newMarked[dateStr].customStyles = {
-              ...newMarked[dateStr].customStyles,
-              container: {
-                ...newMarked[dateStr].customStyles?.container,
-                borderWidth: 2,
-                borderColor: Colors.secondary,
+            // Date avec indisponibilité - ajouter bordure jaune en plus et garder le point jaune
+            newMarked[dateStr] = {
+              ...newMarked[dateStr],
+              marked: true,
+              dotColor: '#FFB800',
+              customStyles: {
+                ...newMarked[dateStr].customStyles,
+                container: {
+                  ...newMarked[dateStr].customStyles?.container,
+                  borderWidth: 2,
+                  borderColor: '#FFB800',
+                }
               }
             };
           }
@@ -337,15 +342,18 @@ export default function FriendsScreen({ navigation }: any) {
 
   return (
     <ScrollView ref={scrollViewRef} style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <Text style={styles.title}>Disponibilités du groupe</Text>
+      <Text style={styles.title}>Mon Groupe</Text>
       
       <GroupSelector navigation={navigation} />
       
-      <Text style={styles.subtitle}>
-        Cliquez sur une date pour voir qui est disponible dans ce groupe.
-      </Text>
 
       <View style={styles.calendarWrapper}>
+        <TouchableOpacity 
+          style={styles.infoButton}
+          onPress={() => setShowTooltip(!showTooltip)}
+        >
+          <Ionicons name="information-circle-outline" size={24} color="#1A3B5C" />
+        </TouchableOpacity>
         <Calendar
         onDayPress={(day) => setSelectedDate(day.dateString)}
         markedDates={{
@@ -358,27 +366,27 @@ export default function FriendsScreen({ navigation }: any) {
                 ...markedDates[selectedDate].customStyles,
                 container: {
                   ...markedDates[selectedDate].customStyles?.container,
-                  backgroundColor: Colors.secondary,
+                  backgroundColor: '#FFB800',
                   borderWidth: 2,
-                  borderColor: Colors.secondary,
+                  borderColor: '#FFB800',
                 },
                 text: {
-                  color: Colors.primary,
+                  color: '#FFFFFF',
                   fontWeight: '600',
                   fontSize: 14
                 }
               } : {
                 // Si pas de marqueurs, cercle jaune rempli
                 container: {
-                  backgroundColor: Colors.secondary,
+                  backgroundColor: '#FFB800',
                   borderRadius: 25,
                   borderWidth: 2,
-                  borderColor: Colors.secondary,
+                  borderColor: '#FFB800',
                   width: 35,
                   height: 35,
                 },
                 text: {
-                  color: Colors.primary,
+                  color: '#FFFFFF',
                   fontWeight: '600',
                   fontSize: 14
                 }
@@ -398,15 +406,16 @@ export default function FriendsScreen({ navigation }: any) {
         theme={{
           backgroundColor: 'transparent',
           calendarBackground: 'transparent',
-          textSectionTitleColor: Colors.secondary,
-          selectedDayBackgroundColor: Colors.secondary,
-          selectedDayTextColor: Colors.primary,
-          todayTextColor: Colors.secondary,
-          dayTextColor: Colors.white,
-          textDisabledColor: 'rgba(255, 255, 255, 0.3)',
-          arrowColor: Colors.secondary,
-          monthTextColor: Colors.white,
-          indicatorColor: Colors.secondary,
+          textSectionTitleColor: '#1A3B5C',
+          selectedDayBackgroundColor: '#FFB800',
+          selectedDayTextColor: '#FFFFFF',
+          todayTextColor: '#FFFFFF',
+          todayBackgroundColor: '#FFB800',
+          dayTextColor: '#1A1A1A',
+          textDisabledColor: 'rgba(26, 26, 26, 0.4)',
+          arrowColor: '#1A3B5C',
+          monthTextColor: '#1A3B5C',
+          indicatorColor: '#FFB800',
           textDayFontFamily: 'System',
           textMonthFontFamily: 'System',
           textDayHeaderFontFamily: 'System',
@@ -447,6 +456,17 @@ export default function FriendsScreen({ navigation }: any) {
         }}
         />
       </View>
+
+      {showTooltip && (
+        <View style={styles.tooltipContainer}>
+          <Text style={styles.tooltipText}>
+            Ici vous voyez tous les événements et indisponibilités de tout le monde dans le groupe.
+          </Text>
+          <Text style={styles.tooltipSubtext}>
+            Ronds bleus = indisponibilités{'\n'}Cercles jaunes = événements{'\n'}Cliquez sur une date pour voir les détails.
+          </Text>
+        </View>
+      )}
 
       {selectedDate && (
         <View style={styles.detailsContainer}>
@@ -573,20 +593,27 @@ export default function FriendsScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.primary,
+    backgroundColor: '#FAFAFA',
   },
   calendarWrapper: {
-    backgroundColor: 'rgba(42, 75, 108, 0.3)',
+    backgroundColor: '#FFFFFF',
     marginHorizontal: 15,
-    borderRadius: 8,
-    padding: 15,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 184, 0, 0.2)',
-    shadowColor: Colors.primaryDark,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    borderRadius: 28,
+    padding: 24,
+    marginVertical: 8,
+    // Effet flottant ultra-réaliste
+    shadowColor: '#1A3B5C',
+    shadowOffset: { width: 0, height: 15 },
+    shadowOpacity: 0.35,
+    shadowRadius: 25,
+    elevation: 20,
+    // Pas de bordure pour effet plus clean
+    borderWidth: 0,
+    // Effet de lévitation
+    transform: [{ translateY: -2 }],
+    // Effet glassmorphism avancé
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backdropFilter: 'blur(10px)',
   },
   contentContainer: {
     paddingBottom: 120,
@@ -595,132 +622,233 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.primary,
+    backgroundColor: '#FAFAFA',
   },
   loadingText: {
     fontSize: 16,
-    color: Colors.white,
+    color: '#1A3B5C',
   },
   title: {
-    fontSize: 26,
-    fontWeight: '300',
-    color: Colors.white,
-    padding: 18,
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#1A3B5C',
+    letterSpacing: 0.5,
+    textAlign: 'center',
     paddingTop: 80,
-    paddingBottom: 12,
+    paddingBottom: 25,
+    paddingHorizontal: 20,
   },
   subtitle: {
-    fontSize: 14,
-    color: Colors.white,
+    fontSize: 15,
+    color: '#2C3E50',
     textAlign: 'center',
     paddingHorizontal: 20,
     marginBottom: 20,
+    fontWeight: '500',
+    lineHeight: 20,
   },
   detailsContainer: {
-    padding: 20,
+    padding: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    marginHorizontal: 15,
+    borderRadius: 28,
+    marginBottom: 25,
+    marginVertical: 8,
+    // Effet flottant identique au calendrier
+    shadowColor: '#1A3B5C',
+    shadowOffset: { width: 0, height: 15 },
+    shadowOpacity: 0.35,
+    shadowRadius: 25,
+    elevation: 20,
+    // Pas de bordure pour effet plus clean
+    borderWidth: 0,
+    // Effet de lévitation
+    transform: [{ translateY: -2 }],
+    // Effet glassmorphism avancé
+    backdropFilter: 'blur(10px)',
   },
   dateTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.white,
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1A3B5C',
     marginBottom: 20,
     textAlign: 'center',
+    letterSpacing: 0.3,
   },
   statusSection: {
     marginBottom: 24,
   },
   statusTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     marginBottom: 12,
   },
   availableTitle: {
-    color: Colors.white,
+    color: '#1A3B5C',
   },
   unavailableTitle: {
-    color: Colors.white,
+    color: '#1A3B5C',
   },
   eventTitle: {
-    color: Colors.white,
+    color: '#1A3B5C',
   },
   userItem: {
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 8,
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 10,
+    shadowColor: '#1A3B5C',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   availableItem: {
-    backgroundColor: Colors.availableSoft,
+    backgroundColor: '#F8F9FA',
+    borderLeftWidth: 4,
+    borderLeftColor: '#1A3B5C',
   },
   unavailableItem: {
-    backgroundColor: Colors.unavailableSoft,
+    backgroundColor: '#F8F9FA',
+    borderLeftWidth: 4,
+    borderLeftColor: '#1A3B5C',
   },
   eventItem: {
-    backgroundColor: Colors.eventSoft,
+    backgroundColor: '#F8F9FA',
+    borderLeftWidth: 4,
+    borderLeftColor: '#FFB800',
   },
   userName: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: Colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1A3B5C',
+    marginBottom: 4,
   },
   unavailableTime: {
-    fontSize: 13,
-    color: '#666',
+    fontSize: 14,
+    color: '#2C3E50',
     marginTop: 4,
+    fontWeight: '500',
   },
   section: {
-    paddingHorizontal: 20,
-    marginBottom: 28,
+    paddingHorizontal: 24,
+    paddingVertical: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    marginHorizontal: 15,
+    marginTop: 25,
+    borderRadius: 28,
+    marginVertical: 8,
+    // Effet flottant identique
+    shadowColor: '#1A3B5C',
+    shadowOffset: { width: 0, height: 15 },
+    shadowOpacity: 0.35,
+    shadowRadius: 25,
+    elevation: 20,
+    borderWidth: 0,
+    transform: [{ translateY: -2 }],
+    backdropFilter: 'blur(10px)',
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.white,
-    marginBottom: 14,
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1A3B5C',
+    marginBottom: 20,
+    textAlign: 'center',
+    letterSpacing: 0.3,
   },
   memberItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 14,
-    backgroundColor: '#F5F5F7',
-    borderRadius: 10,
-    marginBottom: 8,
+    padding: 18,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 18,
+    marginBottom: 12,
+    borderLeftWidth: 5,
+    borderLeftColor: '#FFB800',
+    shadowColor: '#1A3B5C',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 4,
   },
   memberName: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: Colors.primary,
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#1A3B5C',
+    letterSpacing: 0.2,
   },
   memberEmail: {
-    fontSize: 13,
-    color: '#666',
+    fontSize: 14,
+    color: '#2C3E50',
+    fontStyle: 'italic',
+    opacity: 0.8,
   },
   memberRole: {
-    fontSize: 13,
-    color: '#007AFF',
-    fontWeight: '600',
+    fontSize: 14,
+    color: '#FFB800',
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   eventName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: Colors.primary,
+    fontWeight: '700',
+    color: '#1A3B5C',
     marginBottom: 4,
   },
   eventTime: {
     fontSize: 14,
-    color: Colors.event,
-    fontWeight: '500',
+    color: '#1A3B5C',
+    fontWeight: '600',
     marginBottom: 4,
   },
   eventDescription: {
     fontSize: 13,
-    color: '#666',
+    color: '#2C3E50',
     fontStyle: 'italic',
+    opacity: 0.8,
   },
   eventParticipants: {
     fontSize: 12,
-    color: Colors.event,
+    color: '#1A3B5C',
     fontWeight: '500',
     marginBottom: 4,
+  },
+  infoButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(26, 59, 92, 0.1)',
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 10,
+  },
+  tooltipContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    marginHorizontal: 15,
+    borderRadius: 16,
+    marginBottom: 20,
+    shadowColor: '#1A3B5C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(26, 59, 92, 0.1)',
+  },
+  tooltipText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1A3B5C',
+    marginBottom: 8,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  tooltipSubtext: {
+    fontSize: 13,
+    color: '#2C3E50',
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });

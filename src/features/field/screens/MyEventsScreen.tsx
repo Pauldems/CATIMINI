@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from '../../../config/firebase';
+import { AdBanner } from '../../../components/AdBanner';
 import { 
   collection, 
   query, 
@@ -288,45 +289,55 @@ const MyEventsScreen: React.FC<MyEventsScreenProps> = ({ navigation }) => {
     const endDate = new Date(item.endDate);
     const isMultiDay = startDate.toDateString() !== endDate.toDateString();
     
+    // Vérifier si l'événement est terminé
+    const now = new Date();
+    const isFinished = endDate < now;
+    
     return (
       <TouchableOpacity
         style={[
           styles.eventCard, 
           isParticipant && !item.hasConflict && styles.confirmedEvent,
-          item.hasConflict && styles.conflictEvent
+          item.hasConflict && styles.conflictEvent,
+          isFinished && styles.finishedEvent
         ]}
         onPress={() => handleEventPress(item)}
       >
         <View style={styles.eventHeader}>
-          <Text style={styles.eventTitle}>{item.title}</Text>
-          {isParticipant && !item.hasConflict && (
+          <Text style={[styles.eventTitle, isFinished && styles.finishedText]}>{item.title}</Text>
+          {isFinished && (
+            <View style={styles.finishedBadge}>
+              <Text style={styles.finishedBadgeText}>TERMINÉ</Text>
+            </View>
+          )}
+          {!isFinished && isParticipant && !item.hasConflict && (
             <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
           )}
-          {item.hasConflict && (
+          {!isFinished && item.hasConflict && (
             <Ionicons name="close-circle" size={20} color="#FF5252" />
           )}
         </View>
         
-        <Text style={styles.eventCreator}>👤 {item.creatorName}</Text>
+        <Text style={[styles.eventCreator, isFinished && styles.finishedText]}>👤 {item.creatorName}</Text>
         
         <View style={styles.eventDetails}>
           {isMultiDay ? (
-            <Text style={styles.eventDate}>
+            <Text style={[styles.eventDate, isFinished && styles.finishedText]}>
               📅 {formatDateRange(item.startDate, item.endDate)}
             </Text>
           ) : (
             <>
-              <Text style={styles.eventDate}>
+              <Text style={[styles.eventDate, isFinished && styles.finishedText]}>
                 📅 {formatDate(item.startDate)}
               </Text>
-              <Text style={styles.eventTime}>
+              <Text style={[styles.eventTime, isFinished && styles.finishedText]}>
                 ⏰ {formatTime(item.startTime)} - {formatTime(item.endTime)}
               </Text>
             </>
           )}
         </View>
         
-        <Text style={styles.participantsList}>
+        <Text style={[styles.participantsList, isFinished && styles.finishedText]}>
           👥 {item.participantNames?.join(', ')}
         </Text>
       </TouchableOpacity>
@@ -352,6 +363,8 @@ const MyEventsScreen: React.FC<MyEventsScreenProps> = ({ navigation }) => {
         </Text>
       </View>
 
+      <AdBanner />
+
       <FlatList
         ref={flatListRef}
         data={events}
@@ -371,47 +384,53 @@ const MyEventsScreen: React.FC<MyEventsScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.primary,
+    backgroundColor: '#FAFAFA',
   },
   header: {
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: 'transparent',
     paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.primaryDark,
+    paddingTop: 80,
+    paddingBottom: 25,
+    borderBottomWidth: 0,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: Colors.white,
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#1A3B5C',
+    letterSpacing: 0.5,
+    textAlign: 'center',
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: Colors.white,
-    marginTop: 2,
+    fontSize: 16,
+    color: '#FFB800',
+    marginTop: 8,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   listContainer: {
     padding: 15,
     flexGrow: 1,
+    paddingBottom: 120,
   },
   eventCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#1A3B5C',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
+    backdropFilter: 'blur(10px)',
   },
   confirmedEvent: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#4CAF50', // Vert pour disponible/participant
+    borderLeftWidth: 5,
+    borderLeftColor: '#1A3B5C', // Bleu pour participant
   },
   conflictEvent: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#FF5252', // Rouge pour indisponible/conflit
+    borderLeftWidth: 5,
+    borderLeftColor: '#FF6B6B', // Rouge pour conflit
   },
   eventHeader: {
     flexDirection: 'row',
@@ -420,50 +439,78 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   eventTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.textPrimary,
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1A3B5C',
     flex: 1,
+    letterSpacing: 0.2,
   },
   eventCreator: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    marginBottom: 8,
+    fontSize: 15,
+    color: '#2C3E50',
+    marginBottom: 10,
+    fontWeight: '600',
   },
   eventDetails: {
     marginBottom: 8,
   },
   eventDate: {
-    fontSize: 14,
-    color: '#444',
-    marginBottom: 2,
+    fontSize: 15,
+    color: '#1A3B5C',
+    marginBottom: 4,
+    fontWeight: '600',
   },
   eventTime: {
-    fontSize: 14,
-    color: '#444',
+    fontSize: 15,
+    color: '#1A3B5C',
+    fontWeight: '600',
   },
   participantsList: {
-    fontSize: 12,
-    color: '#888',
+    fontSize: 13,
+    color: '#1A3B5C',
+    fontWeight: '600',
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 100,
+    paddingTop: 120,
+    paddingHorizontal: 40,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#666',
-    marginTop: 16,
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1A3B5C',
+    marginTop: 20,
+    textAlign: 'center',
   },
   emptySubText: {
-    fontSize: 14,
-    color: '#888',
+    fontSize: 16,
+    color: '#2C3E50',
     textAlign: 'center',
-    marginTop: 8,
-    paddingHorizontal: 40,
+    marginTop: 12,
+    lineHeight: 22,
+    fontWeight: '500',
+  },
+  finishedEvent: {
+    backgroundColor: 'rgba(200, 200, 200, 0.3)',
+    opacity: 0.7,
+  },
+  finishedText: {
+    color: '#999999',
+  },
+  finishedBadge: {
+    backgroundColor: '#FF4444',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    transform: [{ rotate: '15deg' }],
+  },
+  finishedBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1,
   },
 });
 

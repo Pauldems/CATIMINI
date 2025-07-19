@@ -9,6 +9,7 @@ import {
   Platform,
   Modal,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Calendar, DateData } from 'react-native-calendars';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {
@@ -25,6 +26,7 @@ import {
   getDocs,
 } from 'firebase/firestore';
 import { auth, db } from '../../../config/firebase';
+import premiumService from '../../../services/premiumService';
 import { Availability, Event, User } from '../../../types';
 import notificationService from '../../../services/notificationService';
 import { useCurrentGroup } from '../../../hooks/useCurrentGroup';
@@ -59,6 +61,7 @@ export default function AvailabilityScreen({ navigation }: any) {
   const [allEvents, setAllEvents] = useState<Event[]>([]); // Tous les événements (pour conflits)
   const [markedDates, setMarkedDates] = useState<any>({});
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [showTooltip, setShowTooltip] = useState(false);
 
   // Listener pour remettre la page en haut quand on arrive sur l'écran
   useEffect(() => {
@@ -66,6 +69,13 @@ export default function AvailabilityScreen({ navigation }: any) {
       scrollViewRef.current?.scrollTo({ y: 0, animated: false });
       // Rafraîchir les données quand on revient sur l'onglet
       setRefreshTrigger(prev => prev + 1);
+      // Remettre la date d'aujourd'hui par défaut
+      const today = new Date().toISOString().split('T')[0];
+      setSelectedStartDate(today);
+      setSelectedEndDate('');
+      setIsMultiDay(false);
+      // Fermer le tooltip
+      setShowTooltip(false);
     });
     return unsubscribe;
   }, [navigation]);
@@ -98,16 +108,16 @@ export default function AvailabilityScreen({ navigation }: any) {
           console.log(`🔵 Indispo trouvée pour ${date}: ${data.startTime} - ${data.endTime}, createdByEvent: ${data.createdByEvent}`);
           marked[date] = {
             marked: true,
-            dotColor: Colors.secondary,
+            dotColor: '#1A3B5C',
             customStyles: {
               container: {
-                backgroundColor: Colors.unavailable,
+                backgroundColor: '#1A3B5C',
                 borderRadius: 25,
                 width: 35,
                 height: 35,
               },
               text: {
-                color: Colors.white,
+                color: '#FFFFFF',
                 fontWeight: '600',
                 fontSize: 14
               }
@@ -155,18 +165,18 @@ export default function AvailabilityScreen({ navigation }: any) {
             
             eventMarked[dateStr] = {
               marked: true,
-              dotColor: Colors.primary,
+              dotColor: '#FFB800',
               customStyles: {
                 container: {
                   backgroundColor: 'transparent',
                   borderRadius: 25,
                   borderWidth: 2,
-                  borderColor: Colors.event,
+                  borderColor: '#FFB800',
                   width: 35,
                   height: 35,
                 },
                 text: {
-                  color: Colors.primary,
+                  color: '#1A1A1A',
                   fontWeight: '600',
                   fontSize: 14
                 }
@@ -197,18 +207,18 @@ export default function AvailabilityScreen({ navigation }: any) {
             // Priorité à l'indispo (rond bleu) avec bordure jaune pour l'événement
             combinedMarkers[date] = {
               marked: true,
-              dotColor: Colors.secondary, // Point jaune pour indiquer l'événement
+              dotColor: '#FFB800', // Point jaune pour indiquer l'événement
               customStyles: {
                 container: {
-                  backgroundColor: Colors.unavailable, // Fond bleu de l'indispo
+                  backgroundColor: '#1A3B5C', // Fond bleu de l'indispo
                   borderRadius: 25,
                   width: 35,
                   height: 35,
                   borderWidth: 2,
-                  borderColor: Colors.event, // Bordure jaune pour l'événement
+                  borderColor: '#FFB800', // Bordure jaune pour l'événement
                 },
                 text: {
-                  color: Colors.white,
+                  color: '#FFFFFF',
                   fontWeight: '600',
                   fontSize: 14
                 }
@@ -473,6 +483,32 @@ export default function AvailabilityScreen({ navigation }: any) {
   const addOrMergeUnavailability = async (dateStr: string, newStartTime: Date, newEndTime: Date, groupId?: string) => {
     if (!auth.currentUser) return;
 
+    // Vérifier la limite pour les utilisateurs gratuits
+    if (!premiumService.isPremium()) {
+      // Compter toutes les indisponibilités de l'utilisateur
+      const availsQuery = query(
+        collection(db, 'availabilities'),
+        where('userId', '==', auth.currentUser.uid),
+        where('isAvailable', '==', false)
+      );
+      const snapshot = await getDocs(availsQuery);
+      
+      if (snapshot.size >= premiumService.getAvailabilityLimit()) {
+        Alert.alert(
+          '🌟 Limite atteinte',
+          `Vous avez atteint la limite de ${premiumService.getAvailabilityLimit()} indisponibilités en version gratuite.\n\nPassez à Créno Premium pour ajouter des indisponibilités illimitées et supprimer les publicités !`,
+          [
+            { text: 'Plus tard', style: 'cancel' },
+            { 
+              text: 'Voir Premium', 
+              onPress: () => navigation.navigate('Settings', { showPremium: true })
+            }
+          ]
+        );
+        return;
+      }
+    }
+
     // Récupérer les indisponibilités existantes pour cette date
     const existingUnavails = availabilities[dateStr]?.filter(a => !a.isAvailable) || [];
     
@@ -694,17 +730,17 @@ export default function AvailabilityScreen({ navigation }: any) {
       // Marquer la date de début - PRIORITÉ sur les autres marqueurs
       selectionMarked[selectedStartDate] = {
         selected: true,
-        selectedColor: Colors.secondary,
+        selectedColor: '#FFB800',
         // Forcer le style de sélection même s'il y a une indispo
         customStyles: {
           container: {
-            backgroundColor: Colors.secondary,
+            backgroundColor: '#FFB800',
             borderRadius: 25,
             width: 35,
             height: 35,
           },
           text: {
-            color: Colors.primary,
+            color: '#FFFFFF',
             fontWeight: '600',
             fontSize: 14
           }
@@ -715,17 +751,17 @@ export default function AvailabilityScreen({ navigation }: any) {
         // Marquer la date de fin - PRIORITÉ sur les autres marqueurs
         selectionMarked[selectedEndDate] = {
           selected: true,
-          selectedColor: Colors.secondary,
+          selectedColor: '#FFB800',
           // Forcer le style de sélection même s'il y a une indispo
           customStyles: {
             container: {
-              backgroundColor: Colors.secondary,
+              backgroundColor: '#FFB800',
               borderRadius: 25,
               width: 35,
               height: 35,
             },
             text: {
-              color: Colors.primary,
+              color: '#FFFFFF',
               fontWeight: '600',
               fontSize: 14
             }
@@ -769,10 +805,18 @@ export default function AvailabilityScreen({ navigation }: any) {
 
   return (
     <ScrollView ref={scrollViewRef} style={styles.container} contentContainerStyle={styles.scrollContent}>
-      <Text style={styles.title}>Mes disponibilités</Text>
+      <View style={styles.titleContainer}>
+        <Text style={styles.title}>Mon Agenda</Text>
+      </View>
       
       
       <View style={styles.calendarWrapper}>
+        <TouchableOpacity 
+          style={styles.infoButton}
+          onPress={() => setShowTooltip(!showTooltip)}
+        >
+          <Ionicons name="information-circle-outline" size={24} color="#1A3B5C" />
+        </TouchableOpacity>
         <Calendar
         onDayPress={handleDayPress}
         markedDates={{
@@ -783,23 +827,24 @@ export default function AvailabilityScreen({ navigation }: any) {
         theme={{
           backgroundColor: 'transparent',
           calendarBackground: 'transparent',
-          textSectionTitleColor: Colors.secondary,
-          selectedDayBackgroundColor: Colors.secondary,
-          selectedDayTextColor: Colors.primary,
-          todayTextColor: Colors.secondary,
-          dayTextColor: Colors.white,
-          textDisabledColor: 'rgba(255, 255, 255, 0.3)',
-          dotColor: Colors.secondary,
-          selectedDotColor: Colors.primary,
-          arrowColor: Colors.secondary,
-          monthTextColor: Colors.white,
-          indicatorColor: Colors.secondary,
+          textSectionTitleColor: '#1A3B5C',
+          selectedDayBackgroundColor: '#FFB800',
+          selectedDayTextColor: '#FFFFFF',
+          todayTextColor: '#FFFFFF',
+          todayBackgroundColor: '#FFB800',
+          dayTextColor: '#1A1A1A',
+          textDisabledColor: 'rgba(26, 26, 26, 0.4)',
+          dotColor: '#FFB800',
+          selectedDotColor: '#FFFFFF',
+          arrowColor: '#1A3B5C',
+          monthTextColor: '#1A3B5C',
+          indicatorColor: '#FFB800',
           textDayFontFamily: 'System',
           textMonthFontFamily: 'System',
           textDayHeaderFontFamily: 'System',
-          textDayFontWeight: '500',
-          textMonthFontWeight: '700',
-          textDayHeaderFontWeight: '600',
+          textDayFontWeight: '600',
+          textMonthFontWeight: '800',
+          textDayHeaderFontWeight: '700',
           textDayFontSize: 16,
           textMonthFontSize: 20,
           textDayHeaderFontSize: 13,
@@ -847,29 +892,34 @@ export default function AvailabilityScreen({ navigation }: any) {
         />
       </View>
 
-      <View style={styles.instructionsContainer}>
-        <Text style={styles.instructionsText}>
-          Par défaut, vous êtes disponible. Marquez seulement vos indisponibilités.
-        </Text>
-        <Text style={styles.instructionsSubtext}>
-          Tapez une date pour une indisponibilité d'un jour, ou tapez deux dates pour une période.
-        </Text>
-      </View>
+      {showTooltip && (
+        <View style={styles.tooltipContainer}>
+          <Text style={styles.tooltipText}>
+            Par défaut, vous êtes disponible. Marquez seulement vos indisponibilités.
+          </Text>
+          <Text style={styles.tooltipSubtext}>
+            Tapez une date pour une indisponibilité d'un jour, ou tapez deux dates pour une période.
+          </Text>
+        </View>
+      )}
 
       {selectedStartDate && (
         <View style={styles.detailsContainer}>
-          <Text style={styles.sectionTitle}>
-            {isMultiDay ? (
-              `Du ${new Date(selectedStartDate).toLocaleDateString('fr-FR')} au ${new Date(selectedEndDate || selectedStartDate).toLocaleDateString('fr-FR')}`
-            ) : (
-              new Date(selectedStartDate).toLocaleDateString('fr-FR', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-              })
-            )}
-          </Text>
+          <View style={styles.headerSection}>
+            <Text style={styles.actionLabel}>Créer une indisponibilité</Text>
+            <Text style={styles.sectionTitle}>
+              {isMultiDay ? (
+                `Du ${new Date(selectedStartDate).toLocaleDateString('fr-FR')} au ${new Date(selectedEndDate || selectedStartDate).toLocaleDateString('fr-FR')}`
+              ) : (
+                new Date(selectedStartDate).toLocaleDateString('fr-FR', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })
+              )}
+            </Text>
+          </View>
 
 
           <TouchableOpacity
@@ -915,7 +965,7 @@ export default function AvailabilityScreen({ navigation }: any) {
             onPress={handleAddUnavailability}
           >
             <Text style={styles.buttonText}>
-              Marquer comme indisponible
+              ✓ Confirmer l'indisponibilité
             </Text>
           </TouchableOpacity>
 
@@ -1068,8 +1118,8 @@ export default function AvailabilityScreen({ navigation }: any) {
                 mode="time"
                 is24Hour={true}
                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                textColor={Colors.primary}
-                accentColor={Colors.primary}
+                textColor="#1A3B5C"
+                accentColor="#1A3B5C"
                 onChange={(event, selectedTime) => {
                   if (selectedTime) {
                     setStartTime(selectedTime);
@@ -1117,8 +1167,8 @@ export default function AvailabilityScreen({ navigation }: any) {
                 mode="time"
                 is24Hour={true}
                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                textColor={Colors.primary}
-                accentColor={Colors.primary}
+                textColor="#1A3B5C"
+                accentColor="#1A3B5C"
                 onChange={(event, selectedTime) => {
                   if (selectedTime) {
                     setEndTime(selectedTime);
@@ -1153,23 +1203,30 @@ export default function AvailabilityScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.primary,
+    backgroundColor: '#FAFAFA',
   },
   scrollContent: {
     paddingBottom: 120,
   },
   calendarWrapper: {
-    backgroundColor: 'rgba(42, 75, 108, 0.3)',
+    backgroundColor: '#FFFFFF',
     marginHorizontal: 15,
-    borderRadius: 8,
-    padding: 15,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 184, 0, 0.2)',
-    shadowColor: Colors.primaryDark,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    borderRadius: 28,
+    padding: 24,
+    marginVertical: 8,
+    // Effet flottant ultra-réaliste
+    shadowColor: '#1A3B5C',
+    shadowOffset: { width: 0, height: 15 },
+    shadowOpacity: 0.35,
+    shadowRadius: 25,
+    elevation: 20,
+    // Pas de bordure pour effet plus clean
+    borderWidth: 0,
+    // Effet de lévitation
+    transform: [{ translateY: -2 }],
+    // Effet glassmorphism avancé
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backdropFilter: 'blur(10px)',
   },
   loadingContainer: {
     flex: 1,
@@ -1181,116 +1238,192 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.white,
   },
-  title: {
-    fontSize: 26,
-    fontWeight: '300',
-    color: Colors.white,
-    padding: 18,
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingTop: 80,
-    paddingBottom: 10,
+    paddingBottom: 25,
+    paddingHorizontal: 20,
   },
-  instructionsContainer: {
+  title: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#1A3B5C',
+    letterSpacing: 0.5,
+    flex: 1,
+    textAlign: 'center',
+  },
+  infoButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(26, 59, 92, 0.1)',
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 10,
+  },
+  tooltipContainer: {
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: Colors.secondarySoft,
-    marginHorizontal: 20,
-    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    marginHorizontal: 15,
+    borderRadius: 16,
     marginBottom: 20,
-    marginTop: 15,
+    shadowColor: '#1A3B5C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
     borderWidth: 1,
-    borderColor: Colors.secondaryLight,
+    borderColor: 'rgba(26, 59, 92, 0.1)',
   },
-  instructionsText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: Colors.primary,
+  tooltipText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1A3B5C',
     marginBottom: 8,
     textAlign: 'center',
+    lineHeight: 20,
   },
-  instructionsSubtext: {
-    fontSize: 14,
-    color: Colors.textSecondary,
+  tooltipSubtext: {
+    fontSize: 13,
+    color: '#2C3E50',
     textAlign: 'center',
+    lineHeight: 18,
   },
   detailsContainer: {
-    padding: 20,
+    padding: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    marginHorizontal: 15,
+    borderRadius: 28,
+    marginBottom: 25,
+    marginVertical: 8,
+    // Effet flottant identique au calendrier
+    shadowColor: '#1A3B5C',
+    shadowOffset: { width: 0, height: 15 },
+    shadowOpacity: 0.35,
+    shadowRadius: 25,
+    elevation: 20,
+    // Pas de bordure pour effet plus clean
+    borderWidth: 0,
+    // Effet de lévitation
+    transform: [{ translateY: -2 }],
+    // Effet glassmorphism avancé
+    backdropFilter: 'blur(10px)',
+  },
+  headerSection: {
+    alignItems: 'center',
+    marginBottom: 25,
+  },
+  actionLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFB800',
+    marginBottom: 8,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '400',
-    color: Colors.white,
-    marginBottom: 20,
+    fontWeight: '700',
+    color: '#1A3B5C',
+    textAlign: 'center',
+    letterSpacing: 0.3,
   },
   fullDayButton: {
-    backgroundColor: Colors.secondary,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
+    backgroundColor: '#FFB800',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 28,
     alignItems: 'center',
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: Colors.secondary,
+    marginBottom: 25,
+    shadowColor: '#FFB800',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   fullDayButtonText: {
-    color: Colors.white,
-    fontSize: 16,
-    fontWeight: '600',
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   timeSection: {
     marginBottom: 24,
   },
   timeContainer: {
-    backgroundColor: Colors.primarySoft,
-    padding: 20,
-    borderRadius: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: Colors.primary,
+    backgroundColor: '#F8F9FA',
+    padding: 22,
+    borderRadius: 18,
+    marginBottom: 18,
+    borderWidth: 0,
+    shadowColor: '#1A3B5C',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 4,
   },
   timeLabel: {
-    fontSize: 15,
-    color: Colors.primary,
-    marginBottom: 8,
-    fontWeight: '500',
+    fontSize: 16,
+    color: '#1A3B5C',
+    marginBottom: 10,
+    fontWeight: '700',
   },
   timeValue: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: Colors.primary,
-    marginBottom: 4,
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#1A3B5C',
+    marginBottom: 6,
+    letterSpacing: 0.5,
   },
   timeHint: {
-    fontSize: 13,
-    color: Colors.textSecondary,
+    fontSize: 14,
+    color: '#2C3E50',
     fontStyle: 'italic',
+    opacity: 0.8,
   },
   actionButton: {
-    height: 44,
-    borderRadius: 10,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 18,
+    shadowColor: '#1A3B5C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
   },
   unavailableButton: {
-    backgroundColor: Colors.unavailable,
+    backgroundColor: '#1A3B5C',
   },
   resetButton: {
-    height: 40,
-    borderRadius: 10,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.gray200,
-    marginBottom: 20,
+    backgroundColor: '#E9ECEF',
+    marginBottom: 25,
+    borderWidth: 0,
+    shadowColor: '#1A3B5C',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   resetButtonText: {
-    color: Colors.textSecondary,
-    fontSize: 14,
-    fontWeight: '500',
+    color: '#2C3E50',
+    fontSize: 15,
+    fontWeight: '700',
   },
   buttonText: {
-    color: Colors.white,
-    fontSize: 15,
-    fontWeight: '600',
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   availabilityList: {
     marginTop: 16,
@@ -1298,7 +1431,7 @@ const styles = StyleSheet.create({
   listTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: Colors.primary,
+    color: Colors.secondary,
     marginBottom: 10,
   },
   availabilityItem: {
@@ -1317,11 +1450,11 @@ const styles = StyleSheet.create({
   availabilityText: {
     fontSize: 15,
     fontWeight: '500',
-    color: Colors.primary,
+    color: Colors.secondary,
   },
   availabilityStatus: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: Colors.textMuted,
   },
   modalOverlay: {
     flex: 1,
@@ -1351,8 +1484,8 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: '600',
-    color: Colors.primary,
+    fontWeight: '700',
+    color: Colors.secondary,
     textAlign: 'center',
   },
   pickerContainer: {
@@ -1388,98 +1521,123 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     fontSize: 16,
-    color: Colors.textSecondary,
+    color: Colors.textMuted,
     fontWeight: '500',
   },
   confirmButtonText: {
     fontSize: 16,
-    color: Colors.primary,
-    fontWeight: '600',
+    color: Colors.secondary,
+    fontWeight: '700',
   },
   eventItem: {
-    backgroundColor: Colors.eventSoft,
-    padding: 14,
-    borderRadius: 10,
-    marginBottom: 8,
-  },
-  eventText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.primary,
-    marginBottom: 4,
-  },
-  eventTime: {
-    fontSize: 14,
-    color: Colors.event,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  eventDescription: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    fontStyle: 'italic',
-  },
-  allUnavailabilitiesSection: {
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    backgroundColor: Colors.primary,
-    marginTop: 20,
-  },
-  allUnavailabilitiesTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: Colors.white,
-    marginBottom: 16,
-  },
-  noUnavailabilitiesText: {
-    fontSize: 16,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    fontStyle: 'italic',
-    paddingVertical: 20,
-  },
-  dateGroup: {
-    marginBottom: 20,
-  },
-  dateGroupTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.white,
-    marginBottom: 10,
-    textTransform: 'capitalize',
-  },
-  unavailabilityItem: {
-    backgroundColor: Colors.unavailableSoft,
+    backgroundColor: '#F8F9FA',
     padding: 16,
-    borderRadius: 20,
+    borderRadius: 16,
     marginBottom: 10,
     borderLeftWidth: 4,
-    borderLeftColor: Colors.unavailable,
-    shadowColor: Colors.unavailable,
+    borderLeftColor: '#1A3B5C',
+    shadowColor: '#1A3B5C',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
-  unavailabilityTime: {
+  eventText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: Colors.primary,
+    fontWeight: '700',
+    color: Colors.secondary,
     marginBottom: 4,
   },
-  unavailabilityHint: {
+  eventTime: {
+    fontSize: 14,
+    color: Colors.secondary,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  eventDescription: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: Colors.textMuted,
     fontStyle: 'italic',
+  },
+  allUnavailabilitiesSection: {
+    paddingHorizontal: 24,
+    paddingVertical: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    marginHorizontal: 15,
+    marginTop: 25,
+    borderRadius: 28,
+    marginVertical: 8,
+    // Effet flottant identique
+    shadowColor: '#1A3B5C',
+    shadowOffset: { width: 0, height: 15 },
+    shadowOpacity: 0.35,
+    shadowRadius: 25,
+    elevation: 20,
+    borderWidth: 0,
+    transform: [{ translateY: -2 }],
+    backdropFilter: 'blur(10px)',
+  },
+  allUnavailabilitiesTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1A3B5C',
+    marginBottom: 20,
+    textAlign: 'center',
+    letterSpacing: 0.3,
+  },
+  noUnavailabilitiesText: {
+    fontSize: 17,
+    color: '#2C3E50',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    paddingVertical: 25,
+    opacity: 0.8,
+  },
+  dateGroup: {
+    marginBottom: 20,
+  },
+  dateGroupTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1A3B5C',
+    marginBottom: 12,
+    textTransform: 'capitalize',
+    letterSpacing: 0.2,
+  },
+  unavailabilityItem: {
+    backgroundColor: '#F8F9FA',
+    padding: 18,
+    borderRadius: 18,
+    marginBottom: 12,
+    borderLeftWidth: 5,
+    borderLeftColor: '#FFB800',
+    shadowColor: '#1A3B5C',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  unavailabilityTime: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#1A3B5C',
+    marginBottom: 6,
+    letterSpacing: 0.2,
+  },
+  unavailabilityHint: {
+    fontSize: 14,
+    color: '#2C3E50',
+    fontStyle: 'italic',
+    opacity: 0.8,
   },
   groupUnavailabilityItem: {
     borderLeftColor: Colors.secondary,
     backgroundColor: Colors.secondarySoft,
   },
   groupUnavailabilityText: {
-    fontSize: 13,
-    color: Colors.secondary,
-    fontWeight: '600',
+    fontSize: 14,
+    color: '#1A3B5C',
+    fontWeight: '700',
     fontStyle: 'italic',
   },
 });

@@ -3,8 +3,11 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert, Linking, ScrollView } 
 import { auth } from '../../../config/firebase';
 import { signOut } from 'firebase/auth';
 import { DeleteAccountModal } from '../components/DeleteAccountModal';
+import { PremiumModal } from '../components/PremiumModal';
 import * as Notifications from 'expo-notifications';
 import { Colors } from '../../../theme/colors';
+import premiumService from '../../../services/premiumService';
+import { Ionicons } from '@expo/vector-icons';
 
 interface SettingsScreenProps {
   navigation: any;
@@ -14,13 +17,22 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const [loading, setLoading] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [isPremium, setIsPremium] = useState(false);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
 
   useEffect(() => {
     checkNotificationStatus();
+    checkPremiumStatus();
     
     // Listener pour rafraîchir le statut quand on revient sur l'écran
     const unsubscribe = navigation.addListener('focus', () => {
       checkNotificationStatus();
+      checkPremiumStatus();
+      
+      // Vérifier si on doit afficher le modal premium
+      if (navigation.getState()?.routes?.find((r: any) => r.params?.showPremium)) {
+        setShowPremiumModal(true);
+      }
     });
 
     return unsubscribe;
@@ -33,6 +45,11 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     } catch (error) {
       console.log('Erreur vérification statut notifications:', error);
     }
+  };
+
+  const checkPremiumStatus = async () => {
+    const premium = await premiumService.checkPremiumStatus();
+    setIsPremium(premium);
   };
 
   const handleToggleNotifications = async () => {
@@ -93,6 +110,39 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
         <Text style={styles.title}>Paramètres</Text>
         
+        {/* Bouton Premium */}
+        <TouchableOpacity 
+          style={[
+            styles.premiumButton,
+            isPremium && styles.premiumActiveButton
+          ]}
+          onPress={() => setShowPremiumModal(true)}
+        >
+          <View style={styles.premiumContent}>
+            <Ionicons 
+              name="star" 
+              size={24} 
+              color={isPremium ? '#FFD700' : '#FFB800'} 
+            />
+            <View style={styles.premiumTextContainer}>
+              <Text style={styles.premiumTitle}>
+                {isPremium ? 'Créno Premium ✨' : 'Passer à Premium'}
+              </Text>
+              <Text style={styles.premiumSubtitle} numberOfLines={1}>
+                {isPremium 
+                  ? `Actif - ${premiumService.getRemainingDays()} jours restants`
+                  : 'Sans pub • Indispos & groupes illimités • 2€/mois'
+                }
+              </Text>
+            </View>
+            <Ionicons 
+              name="chevron-forward" 
+              size={20} 
+              color="#999" 
+            />
+          </View>
+        </TouchableOpacity>
+        
         <TouchableOpacity 
           style={[
             styles.button, 
@@ -147,6 +197,14 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         onClose={() => setShowDeleteModal(false)}
         onAccountDeleted={handleAccountDeleted}
       />
+
+      {/* Modal Premium */}
+      <PremiumModal 
+        visible={showPremiumModal}
+        onClose={() => setShowPremiumModal(false)}
+        isPremium={isPremium}
+        onUpgrade={checkPremiumStatus}
+      />
     </View>
   );
 }
@@ -154,76 +212,100 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.primary,
+    backgroundColor: '#FAFAFA',
   },
   scrollContainer: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    padding: 20,
-    paddingTop: 60,
-    paddingBottom: 120, // Espace pour éviter le menu flottant
+    padding: 24,
+    paddingTop: 80,
+    paddingBottom: 120,
   },
   spacer: {
     flex: 1,
     minHeight: 100,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 30,
-    color: Colors.white,
+    fontSize: 32,
+    fontWeight: '800',
+    marginBottom: 40,
+    color: '#1A3B5C',
+    textAlign: 'center',
+    letterSpacing: 0.5,
   },
   button: {
-    padding: 18,
-    borderRadius: 12,
+    padding: 20,
+    borderRadius: 20,
     alignItems: 'center',
-    marginBottom: 15,
-    shadowColor: '#000',
+    marginBottom: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    shadowColor: '#1A3B5C',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 6,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
+    backdropFilter: 'blur(10px)',
   },
   enabledButton: {
-    backgroundColor: Colors.secondary,
-    borderWidth: 2,
-    borderColor: Colors.secondaryLight,
   },
   disabledButton: {
-    backgroundColor: Colors.gray500,
-    borderWidth: 2,
-    borderColor: Colors.gray600,
   },
   privacyButton: {
-    backgroundColor: Colors.primary,
-    borderWidth: 2,
-    borderColor: Colors.primaryLight,
   },
   logoutButton: {
-    backgroundColor: Colors.secondary,
-    borderWidth: 2,
-    borderColor: Colors.secondaryLight,
     marginBottom: 15,
   },
   deleteButton: {
-    backgroundColor: '#DC3545',
-    borderWidth: 2,
-    borderColor: '#E85D75',
     marginBottom: 20,
   },
   buttonText: {
-    color: Colors.white,
+    color: '#1A3B5C',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
   deleteButtonText: {
-    color: Colors.white,
+    color: '#FF6B6B',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  premiumButton: {
+    backgroundColor: 'rgba(255, 184, 0, 0.1)',
+    borderWidth: 2,
+    borderColor: '#FFB800',
+    marginBottom: 20,
+    borderRadius: 16,
+    padding: 0,
+  },
+  premiumActiveButton: {
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderColor: '#4CAF50',
+  },
+  premiumContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+  },
+  premiumTextContainer: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  premiumTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1A3B5C',
+    marginBottom: 4,
+  },
+  premiumSubtitle: {
+    fontSize: 12,
+    color: '#666',
+    lineHeight: 14,
+    numberOfLines: 1,
   },
 });

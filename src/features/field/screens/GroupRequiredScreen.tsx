@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { auth } from '../../../config/firebase';
 import groupService from '../../../services/groupService';
+import premiumService from '../../../services/premiumService';
 import { Colors } from '../../../theme/colors';
 
 interface GroupRequiredScreenProps {
@@ -26,6 +27,28 @@ export default function GroupRequiredScreen({ onGroupSelected }: GroupRequiredSc
     if (!groupName.trim()) {
       Alert.alert('Erreur', 'Veuillez entrer un nom pour le groupe');
       return;
+    }
+
+    // Vérifier la limite de groupes pour les utilisateurs gratuits
+    if (!premiumService.isPremium()) {
+      const userGroups = await groupService.getUserGroups(auth.currentUser!.uid);
+      if (userGroups.length >= premiumService.getGroupLimit()) {
+        Alert.alert(
+          '🌟 Limite atteinte',
+          `Vous avez atteint la limite de ${premiumService.getGroupLimit()} groupe en version gratuite.\n\nPassez à Créno Premium pour créer des groupes illimités et supprimer les publicités !`,
+          [
+            { text: 'Plus tard', style: 'cancel' },
+            { 
+              text: 'Devenir Premium', 
+              onPress: () => {
+                // Naviguer vers les paramètres avec modal premium
+                // TODO: implémenter navigation premium
+              }
+            }
+          ]
+        );
+        return;
+      }
     }
 
     setLoading(true);
@@ -49,6 +72,28 @@ export default function GroupRequiredScreen({ onGroupSelected }: GroupRequiredSc
     if (!inviteCode.trim()) {
       Alert.alert('Erreur', 'Veuillez entrer un code d\'invitation');
       return;
+    }
+
+    // Vérifier la limite de groupes pour les utilisateurs gratuits
+    if (!premiumService.isPremium()) {
+      const userGroups = await groupService.getUserGroups(auth.currentUser!.uid);
+      if (userGroups.length >= premiumService.getGroupLimit()) {
+        Alert.alert(
+          '🌟 Limite atteinte',
+          `Vous avez atteint la limite de ${premiumService.getGroupLimit()} groupe en version gratuite.\n\nPassez à Créno Premium pour rejoindre des groupes illimités et supprimer les publicités !`,
+          [
+            { text: 'Plus tard', style: 'cancel' },
+            { 
+              text: 'Devenir Premium', 
+              onPress: () => {
+                // Naviguer vers les paramètres avec modal premium
+                // TODO: implémenter navigation premium
+              }
+            }
+          ]
+        );
+        return;
+      }
     }
 
     setLoading(true);
@@ -210,26 +255,27 @@ export default function GroupRequiredScreen({ onGroupSelected }: GroupRequiredSc
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.primary,
+    backgroundColor: '#FAFAFA',
     justifyContent: 'center',
   },
   content: {
     paddingHorizontal: 24,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '300',
-    color: Colors.white,
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#1A3B5C',
+    letterSpacing: 0.5,
     textAlign: 'center',
     marginBottom: 12,
   },
   subtitle: {
-    fontSize: 16,
-    color: Colors.white,
+    fontSize: 17,
+    color: '#2C3E50',
     textAlign: 'center',
     marginBottom: 40,
     lineHeight: 24,
-    opacity: 0.9,
+    fontWeight: '500',
   },
   buttonContainer: {
     gap: 16,
@@ -244,14 +290,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   secondaryButton: {
-    backgroundColor: Colors.white,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     paddingVertical: 18,
     paddingHorizontal: 20,
-    borderRadius: 12,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Colors.white,
+    borderWidth: 2,
+    borderColor: 'rgba(26, 59, 92, 0.2)',
+    shadowColor: '#1A3B5C',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   backButton: {
     backgroundColor: '#F5F5F7',
@@ -270,9 +321,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   secondaryButtonText: {
-    color: Colors.primary,
+    color: '#1A3B5C',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '800',
+    letterSpacing: 0.2,
     textAlign: 'center',
   },
   backButtonText: {

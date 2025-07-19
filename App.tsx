@@ -41,9 +41,14 @@ import { FriendsScreen, SettingsScreen } from './src/features/profile/screens';
 
 // Services
 import notificationService from './src/services/notificationService';
+import adMobService from './src/services/adMobService';
+import premiumService from './src/services/premiumService';
 
 // Components
 import { CustomTabBar } from './src/components';
+
+// Hooks
+import { useCleanup } from './src/hooks/useCleanup';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -57,6 +62,7 @@ function AuthStack() {
     >
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
+      <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
     </Stack.Navigator>
   );
 }
@@ -184,6 +190,9 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const navigationRef = React.useRef<NavigationContainerRef<any>>(null);
+  
+  // Déclencher le nettoyage automatique (désactivé temporairement)
+  // useCleanup();
 
   useEffect(() => {
     // Vérifier s'il y a un utilisateur en cache
@@ -215,6 +224,11 @@ export default function App() {
           email: user.email,
           displayName: user.displayName
         }));
+        
+        // Initialiser les services
+        premiumService.initialize();
+        adMobService.initialize();
+        adMobService.showLaunchAd();
         
         // Initialiser les notifications après connexion (avec délai pour inscription)
         setTimeout(async () => {

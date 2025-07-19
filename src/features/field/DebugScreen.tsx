@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { auth, db } from '../../../config/firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
@@ -92,22 +93,29 @@ export default function DebugScreen() {
   };
 
   const testPushNotification = async () => {
-    if (!debugInfo.userData?.pushToken) {
+    if (!debugInfo.userData?.expoPushToken) {
       Alert.alert('Erreur', 'Aucun token push trouvé');
       return;
     }
 
     try {
       Alert.alert('Test', 'Envoi de la notification...');
-      await pushNotificationService.sendPushNotification(
-        debugInfo.userData.pushToken,
-        'Test Notification',
-        'Ceci est une notification de test',
-        { test: true }
-      );
-      Alert.alert('Succès', 'Notification envoyée');
-    } catch (error) {
-      Alert.alert('Erreur', error.message);
+      
+      // Appeler la fonction Firebase testNotification
+      const functions = getFunctions();
+      const testNotificationFunction = httpsCallable(functions, 'testNotification');
+      
+      const result = await testNotificationFunction({
+        title: '🧪 Test Notification',
+        message: 'Ceci est une notification de test depuis l\'app',
+        testMode: false // Créer la notification dans Firestore
+      });
+      
+      console.log('Test notification result:', result.data);
+      Alert.alert('Succès', 'Notification envoyée avec succès !');
+    } catch (error: any) {
+      console.error('Erreur test notification:', error);
+      Alert.alert('Erreur', error.message || 'Erreur lors de l\'envoi de la notification');
     }
   };
 
@@ -150,13 +158,11 @@ export default function DebugScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Push Notifications</Text>
         <Text>Permission: {debugInfo.permissions.current}</Text>
-        <Text>Has Token: {debugInfo.userData?.pushToken ? 'Oui' : 'Non'}</Text>
-        {debugInfo.userData?.pushToken && (
+        <Text>Has Token: {debugInfo.userData?.expoPushToken ? 'Oui' : 'Non'}</Text>
+        {debugInfo.userData?.expoPushToken && (
           <>
-            <Text>Token: {debugInfo.userData.pushToken.substring(0, 30)}...</Text>
-            <Text>Platform: {debugInfo.userData.platform}</Text>
-            <Text>Token Type: {debugInfo.userData.tokenType}</Text>
-            <Text>Updated: {debugInfo.userData.pushTokenUpdatedAt?.toDate?.()?.toLocaleString?.() || 'Unknown'}</Text>
+            <Text>Token: {debugInfo.userData.expoPushToken.substring(0, 30)}...</Text>
+            <Text>Updated: {debugInfo.userData.lastTokenUpdate || 'Unknown'}</Text>
           </>
         )}
       </View>
@@ -167,9 +173,9 @@ export default function DebugScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={[styles.button, !debugInfo.userData?.pushToken && styles.buttonDisabled]} 
+          style={[styles.button, !debugInfo.userData?.expoPushToken && styles.buttonDisabled]} 
           onPress={testPushNotification}
-          disabled={!debugInfo.userData?.pushToken}
+          disabled={!debugInfo.userData?.expoPushToken}
         >
           <Text style={styles.buttonText}>Tester envoi notification</Text>
         </TouchableOpacity>

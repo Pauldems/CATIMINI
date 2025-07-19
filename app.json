@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.catimini.app",
-      "buildNumber": "39",
+      "buildNumber": "41",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": [
@@ -29,6 +29,12 @@
               "CA92.1"
             ]
           }
+        ],
+        "NSUserTrackingUsageDescription": "This identifier will be used to deliver personalized ads to you.",
+        "SKAdNetworkItems": [
+          {
+            "SKAdNetworkIdentifier": "cstr6suwn9.skadnetwork"
+          }
         ]
       },
       "entitlements": {
@@ -36,7 +42,7 @@
       }
     },
     "android": {
-      "versionCode": 39,
+      "versionCode": 41,
       "package": "com.catimini.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -61,12 +67,19 @@
           "defaultChannel": "default",
           "mode": "production"
         }
+      ],
+      [
+        "expo-ads-admob",
+        {
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "iosAppId": "ca-app-pub-6698381010934241~4890479928"
+        }
       ]
     ],
-    "owner": "pablo1367",
+    "owner": "paulopaul1",
     "extra": {
       "eas": {
-        "projectId": "e12fe417-6270-48c6-b2f1-444535f037cb"
+        "projectId": "692d5872-558a-420c-95c5-ddb29f0a3e8d"
       }
     }
   }

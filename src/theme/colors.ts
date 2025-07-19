@@ -1,28 +1,29 @@
-// Palette de couleurs basée sur le logo Créno
+// Palette de couleurs - DA bleu logo + blanc
 export const Colors = {
-  // Couleurs principales du logo
-  primary: '#1A3B5C',      // Bleu marine du logo
-  secondary: '#FFB800',     // Jaune doré du logo
+  // Couleurs principales
+  primary: '#FFFFFF',       // Blanc pour les fonds
+  secondary: '#1A3B5C',     // Bleu marine du logo pour les textes/titres
+  accent: '#FFB800',        // Jaune uniquement pour le bouton plus
   white: '#FFFFFF',
   
-  // Variations de la couleur principale (bleu marine)
+  // Variations du bleu logo
   primaryLight: '#2A4B6C',
   primaryDark: '#0A2B4C',
   primarySoft: '#E8F0F8',
   primaryVeryLight: '#F5F8FC',
   
-  // Variations du jaune doré
-  secondaryLight: '#FFC533',
-  secondaryDark: '#E6A500',
-  secondarySoft: '#FFF8E6',
-  secondaryVeryLight: '#FFFCF0',
+  // Variations du blanc
+  secondaryLight: '#F8F9FA',
+  secondaryDark: '#E8E9EA',
+  secondarySoft: '#F1F3F4',
+  secondaryVeryLight: '#FAFBFC',
   
-  // États basés sur les couleurs du logo
-  available: '#1A3B5C',        // Bleu marine pour disponible
+  // États mis à jour
+  available: '#1A3B5C',        // Bleu logo pour disponible
   availableSoft: '#E8F0F8',    // Bleu très clair
-  event: '#FFB800',            // Jaune pour les événements
-  eventSoft: '#FFF8E6',        // Jaune très clair
-  unavailable: '#2A4B6C',      // Bleu plus foncé pour indisponible
+  event: '#1A3B5C',            // Bleu logo pour les événements
+  eventSoft: '#E8F0F8',        // Bleu très clair
+  unavailable: '#2A4B6C',      // Bleu plus clair pour indisponible
   unavailableSoft: '#F5F8FC',  // Bleu ultra clair
   
   // Couleurs neutres
@@ -37,15 +38,15 @@ export const Colors = {
   gray800: '#262626',
   gray900: '#171717',
   
-  // Backgrounds
+  // Backgrounds - blanc pour les menus
   background: '#FFFFFF',
-  backgroundSoft: '#FAFBFC',
+  backgroundSoft: '#F5F8FC',
   surface: '#FFFFFF',
   surfaceElevated: '#FFFFFF',
   
   // Text colors
   textPrimary: '#1A3B5C',
-  textSecondary: '#525252',
+  textSecondary: '#2A4B6C',
   textMuted: '#737373',
   textInverse: '#FFFFFF',
   
@@ -56,8 +57,8 @@ export const Colors = {
 };
 
 export const Gradients = {
-  primary: ['#FFB800', '#FFC533'],
-  secondary: ['#1A3B5C', '#2A4B6C'],
-  warm: ['#FFB800', '#FF9500'],
-  cool: ['#2A4B6C', '#1A3B5C'],
+  primary: ['#1A3B5C', '#2A4B6C'],
+  secondary: ['#FFFFFF', '#F8F9FA'],
+  accent: ['#FFB800', '#FFC533'],   // Garde le jaune pour le bouton plus
+  cool: ['#1A3B5C', '#0A2B4C'],
 };

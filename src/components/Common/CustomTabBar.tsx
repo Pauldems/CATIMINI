@@ -7,6 +7,7 @@ import {
   Text,
   Animated,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../theme/colors';
@@ -57,8 +58,12 @@ export default function CustomTabBar({ state, descriptors, navigation }: CustomT
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
-      {/* Arrière-plan pour masquer le contenu */}
-      <View style={[styles.background, { backgroundColor: Colors.primary }]} />
+      {/* Dégradé invisible qui apparaît seulement quand le contenu passe dessus */}
+      <LinearGradient
+        colors={['transparent', 'rgba(250, 250, 250, 0.95)']}
+        style={styles.gradientMask}
+        pointerEvents="none"
+      />
       
       <View style={styles.tabBar}>
         {state.routes.map((route: any, index: number) => {
@@ -95,11 +100,11 @@ export default function CustomTabBar({ state, descriptors, navigation }: CustomT
               <Ionicons
                 name={iconName}
                 size={24}
-                color={isFocused ? Colors.primary : Colors.gray400}
+                color={isFocused ? Colors.white : Colors.gray400}
               />
               <Text style={[
                 styles.label,
-                { color: isFocused ? Colors.primary : Colors.gray400 }
+                { color: isFocused ? Colors.white : Colors.gray400 }
               ]}>
                 {label}
               </Text>
@@ -169,16 +174,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     height: 100,
   },
-  background: {
+  gradientMask: {
     position: 'absolute',
     bottom: -10,
     left: 0,
     right: 0,
-    height: 120,
+    height: 80,
+    zIndex: 1,
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.secondary,
     borderTopWidth: 0,
     paddingTop: 12,
     paddingBottom: 8,
@@ -186,6 +192,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
     marginBottom: 10,
     borderRadius: 25,
+    zIndex: 2,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -216,17 +223,18 @@ const styles = StyleSheet.create({
     marginLeft: -32,
     width: 64,
     height: 64,
+    zIndex: 3,
   },
   createButton: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: Colors.secondary,
+    backgroundColor: Colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
     ...Platform.select({
       ios: {
-        shadowColor: Colors.secondary,
+        shadowColor: Colors.accent,
         shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.4,
         shadowRadius: 8,
