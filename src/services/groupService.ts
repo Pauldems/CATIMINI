@@ -218,6 +218,66 @@ class GroupService {
       currentGroupId: groupId
     });
   }
+
+  /**
+   * Supprimer un groupe (créateur uniquement)
+   */
+  async deleteGroup(groupId: string): Promise<boolean> {
+    try {
+      // 1. Supprimer tous les événements du groupe
+      const eventsQuery = query(
+        collection(db, 'events'),
+        where('groupId', '==', groupId)
+      );
+      const eventsSnapshot = await getDocs(eventsQuery);
+      
+      for (const eventDoc of eventsSnapshot.docs) {
+        // Supprimer les indisponibilités créées par cet événement
+        const unavailabilityQuery = query(
+          collection(db, 'availabilities'),
+          where('createdByEvent', '==', eventDoc.id)
+        );
+        const unavailSnapshot = await getDocs(unavailabilityQuery);
+        
+        for (const unavailDoc of unavailSnapshot.docs) {
+          await deleteDoc(unavailDoc.ref);
+        }
+        
+        // Supprimer l'événement
+        await deleteDoc(eventDoc.ref);
+      }
+
+      // 2. Supprimer tous les memberships du groupe
+      const membershipQuery = query(
+        collection(db, 'groupMemberships'),
+        where('groupId', '==', groupId)
+      );
+      const membershipSnapshot = await getDocs(membershipQuery);
+      
+      for (const membershipDoc of membershipSnapshot.docs) {
+        // Pour chaque membre, vérifier si c'était leur groupe actuel
+        const userId = membershipDoc.data().userId;
+        const userDoc = await getDoc(doc(db, 'users', userId));
+        
+        if (userDoc.exists() && userDoc.data().currentGroupId === groupId) {
+          // Réinitialiser le groupe actuel
+          await updateDoc(doc(db, 'users', userId), {
+            currentGroupId: null
+          });
+        }
+        
+        await deleteDoc(membershipDoc.ref);
+      }
+
+      // 3. Supprimer le groupe lui-même
+      await deleteDoc(doc(db, 'groups', groupId));
+
+      return true;
+    } catch (error) {
+      console.error('Erreur lors de la suppression du groupe:', error);
+      return false;
+    }
+  }
 }
 
 export default new GroupService();

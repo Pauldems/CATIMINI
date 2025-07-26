@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -22,6 +23,7 @@ import GroupSelector from '../../field/components/GroupSelector';
 import { useCurrentGroup } from '../../../hooks/useCurrentGroup';
 import GroupRequiredScreen from '../../field/screens/GroupRequiredScreen';
 import { Colors } from '../../../theme/colors';
+import groupService from '../../../services/groupService';
 
 export default function FriendsScreen({ navigation }: any) {
   const { currentGroup, loading: groupLoading, needsGroupSelection } = useCurrentGroup();
@@ -33,6 +35,23 @@ export default function FriendsScreen({ navigation }: any) {
   const [markedDates, setMarkedDates] = useState<any>({});
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showTooltip, setShowTooltip] = useState(false);
+
+  const handleDeleteGroup = async () => {
+    if (!currentGroup) return;
+    
+    try {
+      const success = await groupService.deleteGroup(currentGroup.id);
+      if (success) {
+        Alert.alert('Succès', 'Le groupe a été supprimé.');
+        // La redirection sera gérée par useCurrentGroup
+      } else {
+        Alert.alert('Erreur', 'Impossible de supprimer le groupe.');
+      }
+    } catch (error) {
+      console.error('Erreur suppression groupe:', error);
+      Alert.alert('Erreur', 'Une erreur est survenue lors de la suppression du groupe.');
+    }
+  };
 
   // Listener pour remettre la page en haut quand on arrive sur l'écran
   useEffect(() => {
@@ -586,6 +605,31 @@ export default function FriendsScreen({ navigation }: any) {
           </View>
         ))}
       </View>
+      
+      {currentGroup && currentGroup.creatorId === auth.currentUser?.uid && (
+        <View style={[styles.section, { marginTop: 20 }]}>
+          <TouchableOpacity 
+            style={styles.deleteGroupButton}
+            onPress={() => {
+              Alert.alert(
+                'Supprimer le groupe',
+                `Êtes-vous sûr de vouloir supprimer le groupe "${currentGroup.name}" ?\n\nCette action est irréversible. Tous les membres seront exclus et toutes les données (événements, indisponibilités) seront perdues.`,
+                [
+                  { text: 'Annuler', style: 'cancel' },
+                  { 
+                    text: 'Supprimer', 
+                    style: 'destructive',
+                    onPress: handleDeleteGroup
+                  }
+                ]
+              );
+            }}
+          >
+            <Ionicons name="trash-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+            <Text style={styles.deleteGroupButtonText}>Supprimer le groupe</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -850,5 +894,25 @@ const styles = StyleSheet.create({
     color: '#2C3E50',
     textAlign: 'center',
     lineHeight: 18,
+  },
+  deleteGroupButton: {
+    backgroundColor: '#FF6B6B',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#FF6B6B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  deleteGroupButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
 });

@@ -8,6 +8,3 @@ export { EventCard } from './Events/EventCard';
 export { Button } from './Common/Button';
 export { default as CustomTabBar } from './Common/CustomTabBar';
 export { default as ScreenWrapper } from './Common/ScreenWrapper';
-
-// Ad components
-export { AdBanner } from './AdBanner';

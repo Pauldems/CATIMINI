@@ -1,10 +1,13 @@
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import storeKitService from './storeKitService';
 
 const PREMIUM_STORAGE_KEY = 'user_premium_status';
+// Limites pour les utilisateurs gratuits
 const FREE_AVAILABILITY_LIMIT = 10;
 const FREE_GROUP_LIMIT = 1;
+const FREE_EVENT_CREATION_LIMIT = 3;
 
 interface PremiumStatus {
   isPremium: boolean;
@@ -48,6 +51,28 @@ class PremiumService {
   }
 
   async checkPremiumStatus(): Promise<boolean> {
+    try {
+      // Vérifier d'abord avec StoreKit
+      try {
+        const isPremiumStoreKit = await storeKitService.checkSubscriptionStatus();
+        if (isPremiumStoreKit) {
+          this.premiumStatus = { isPremium: true };
+          await this.savePremiumStatus(true);
+          return true;
+        }
+      } catch (storeKitError) {
+        console.warn('StoreKit non disponible, vérification Firebase uniquement');
+      }
+      
+      // Sinon vérifier dans Firebase
+      return await this.checkFirebasePremiumStatus();
+    } catch (error) {
+      console.error('Erreur vérification premium:', error);
+      return this.premiumStatus.isPremium || false;
+    }
+  }
+
+  private async checkFirebasePremiumStatus(): Promise<boolean> {
     try {
       const user = auth.currentUser;
       if (!user) return false;
@@ -114,36 +139,49 @@ class PremiumService {
     return this.isPremium() ? Infinity : FREE_GROUP_LIMIT;
   }
 
-  async activatePremium(durationMonths: number = 1) {
+  async activatePremium(): Promise<boolean> {
     try {
-      const user = auth.currentUser;
-      if (!user) throw new Error('Utilisateur non connecté');
-
-      const now = new Date();
-      const expiresAt = new Date(now);
-      expiresAt.setMonth(expiresAt.getMonth() + durationMonths);
-
-      await updateDoc(doc(db, 'users', user.uid), {
-        isPremium: true,
-        premiumSubscribedAt: now.toISOString(),
-        premiumExpiresAt: expiresAt.toISOString(),
-        updatedAt: now.toISOString()
-      });
-
-      this.premiumStatus = {
-        isPremium: true,
-        subscribedAt: now.toISOString(),
-        expiresAt: expiresAt.toISOString()
-      };
-
-      await AsyncStorage.setItem(PREMIUM_STORAGE_KEY, JSON.stringify(this.premiumStatus));
+      // Utiliser StoreKit pour l'achat
+      const success = await storeKitService.purchasePremium();
       
-      console.log('✨ Premium activé avec succès');
-      return true;
+      if (success) {
+        // Mettre à jour Firebase
+        const user = auth.currentUser;
+        if (user) {
+          await updateDoc(doc(db, 'users', user.uid), {
+            isPremium: true,
+            premiumSubscribedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+        }
+        
+        this.premiumStatus = { isPremium: true };
+        await AsyncStorage.setItem(PREMIUM_STORAGE_KEY, JSON.stringify(this.premiumStatus));
+        console.log('✨ Premium activé avec succès');
+      }
+      
+      return success;
     } catch (error) {
       console.error('Erreur activation premium:', error);
       throw error;
     }
+  }
+  
+  async restorePurchases(): Promise<boolean> {
+    try {
+      const restored = await storeKitService.restorePurchases();
+      if (restored) {
+        await this.checkPremiumStatus();
+      }
+      return restored;
+    } catch (error) {
+      console.error('Erreur restauration achats:', error);
+      return false;
+    }
+  }
+  
+  async getSubscriptionPrice(): Promise<string> {
+    return await storeKitService.getPrice();
   }
 
   async removePremiumStatus() {

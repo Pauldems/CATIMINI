@@ -29,10 +29,10 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       checkNotificationStatus();
       checkPremiumStatus();
       
-      // Vérifier si on doit afficher le modal premium
-      if (navigation.getState()?.routes?.find((r: any) => r.params?.showPremium)) {
-        setShowPremiumModal(true);
-      }
+      // TEMPORAIREMENT DÉSACTIVÉ - Modal premium
+      // if (navigation.getState()?.routes?.find((r: any) => r.params?.showPremium)) {
+      //   setShowPremiumModal(true);
+      // }
     });
 
     return unsubscribe;
@@ -113,33 +113,20 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         {/* Bouton Premium */}
         <TouchableOpacity 
           style={[
-            styles.premiumButton,
-            isPremium && styles.premiumActiveButton
+            styles.button, 
+            isPremium ? styles.premiumActiveButton : styles.premiumButton
           ]}
           onPress={() => setShowPremiumModal(true)}
         >
-          <View style={styles.premiumContent}>
+          <View style={styles.premiumButtonContent}>
             <Ionicons 
               name="star" 
-              size={24} 
+              size={20} 
               color={isPremium ? '#FFD700' : '#FFB800'} 
             />
-            <View style={styles.premiumTextContainer}>
-              <Text style={styles.premiumTitle}>
-                {isPremium ? 'Créno Premium ✨' : 'Passer à Premium'}
-              </Text>
-              <Text style={styles.premiumSubtitle} numberOfLines={1}>
-                {isPremium 
-                  ? `Actif - ${premiumService.getRemainingDays()} jours restants`
-                  : 'Sans pub • Indispos & groupes illimités • 2€/mois'
-                }
-              </Text>
-            </View>
-            <Ionicons 
-              name="chevron-forward" 
-              size={20} 
-              color="#999" 
-            />
+            <Text style={[styles.buttonText, styles.premiumButtonText]}>
+              {isPremium ? 'Créno Premium actif' : 'Passer à Premium'}
+            </Text>
           </View>
         </TouchableOpacity>
         
@@ -199,11 +186,14 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       />
 
       {/* Modal Premium */}
-      <PremiumModal 
+      <PremiumModal
         visible={showPremiumModal}
         onClose={() => setShowPremiumModal(false)}
         isPremium={isPremium}
-        onUpgrade={checkPremiumStatus}
+        onUpgrade={() => {
+          checkPremiumStatus();
+          setShowPremiumModal(false);
+        }}
       />
     </View>
   );
@@ -285,7 +275,21 @@ const styles = StyleSheet.create({
   },
   premiumActiveButton: {
     backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderWidth: 2,
     borderColor: '#4CAF50',
+    marginBottom: 20,
+    borderRadius: 16,
+  },
+  premiumButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  premiumButtonText: {
+    marginLeft: 8,
+    fontSize: 18,
+    fontWeight: '700',
   },
   premiumContent: {
     flexDirection: 'row',

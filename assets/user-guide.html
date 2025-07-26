@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guide d'utilisation - Créno</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #1A3B5C;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #FAFAFA;
+        }
+        
+        h1 {
+            color: #1A3B5C;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        h2 {
+            color: #1A3B5C;
+            font-size: 1.8em;
+            margin-top: 40px;
+            border-bottom: 2px solid #FFB800;
+            padding-bottom: 10px;
+        }
+        
+        h3 {
+            color: #FFB800;
+            font-size: 1.3em;
+            margin-top: 25px;
+        }
+        
+        .step {
+            background: white;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-left: 4px solid #FFB800;
+        }
+        
+        .step-number {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            background: #FFB800;
+            color: white;
+            text-align: center;
+            line-height: 30px;
+            border-radius: 50%;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        
+        .color-box {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+            vertical-align: middle;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        
+        .tip {
+            background: #E8F4F8;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #4FC3F7;
+        }
+        
+        .warning {
+            background: #FFF3E0;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #FF6B6B;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .feature-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        /* Style iOS pour les sections */
+        .ios-container {
+            background: #FFFFFF;
+            border-radius: 20px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 4px 12px rgba(26, 59, 92, 0.08);
+        }
+        
+        .ios-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
+        }
+        
+        .ios-icon {
+            width: 40px;
+            height: 40px;
+            background: #F2F2F7;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            margin-right: 16px;
+        }
+        
+        .ios-title {
+            font-size: 17px;
+            font-weight: 600;
+            color: #1A3B5C;
+            flex: 1;
+        }
+        
+        .ios-content {
+            color: #666;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+        
+        .ios-list {
+            list-style: none;
+            padding: 0;
+            margin: 12px 0 0 0;
+        }
+        
+        .ios-list li {
+            padding: 12px 0;
+            border-bottom: 0.5px solid rgba(0, 0, 0, 0.05);
+            color: #666;
+            font-size: 15px;
+        }
+        
+        .ios-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .ios-section {
+            margin-bottom: 30px;
+        }
+        
+        .icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        
+        ul {
+            padding-left: 25px;
+        }
+        
+        li {
+            margin: 8px 0;
+        }
+        
+        code {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        
+        .navigation {
+            position: fixed;
+            right: 20px;
+            top: 100px;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            max-width: 200px;
+        }
+        
+        .navigation h4 {
+            margin-top: 0;
+            color: #1A3B5C;
+        }
+        
+        .navigation a {
+            display: block;
+            color: #1A3B5C;
+            text-decoration: none;
+            padding: 5px 0;
+            font-size: 0.9em;
+        }
+        
+        .navigation a:hover {
+            color: #FFB800;
+        }
+        
+        @media (max-width: 1200px) {
+            .navigation {
+                display: none;
+            }
+        }
+        
+        /* Styles pour le calendrier interactif */
+        .calendar-demo-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin: 30px 0;
+            align-items: start;
+        }
+        
+        @media (max-width: 800px) {
+            .calendar-demo-container {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .calendar-demo {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .calendar-container {
+            max-width: 350px;
+            margin: 0 auto;
+        }
+        
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .calendar-nav-button {
+            width: 30px;
+            height: 30px;
+            border: none;
+            background: none;
+            color: #FFB800;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .calendar-month-year {
+            font-size: 17px;
+            font-weight: 600;
+            color: #1A3B5C;
+        }
+        
+        .calendar-weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            margin-bottom: 10px;
+        }
+        
+        .weekday {
+            text-align: center;
+            font-size: 11px;
+            font-weight: 600;
+            color: #8E8E93;
+            text-transform: uppercase;
+            padding: 5px 0;
+        }
+        
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+        }
+        
+        .calendar-day {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+            color: #1A1A1A;
+            border-radius: 25px;
+            position: relative;
+            width: 35px;
+            height: 35px;
+            margin: 0 auto;
+        }
+        
+        .calendar-day.selected {
+            background-color: #FFB800;
+            color: #FFFFFF;
+        }
+        
+        .calendar-day.unavailable {
+            background-color: #1A3B5C;
+            color: #FFFFFF;
+        }
+        
+        .calendar-day.event {
+            background-color: transparent;
+            border: 2px solid #FFB800;
+            color: #1A1A1A;
+        }
+        
+        .calendar-day.event::after {
+            content: '';
+            position: absolute;
+            bottom: 3px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 4px;
+            background-color: #FFB800;
+            border-radius: 50%;
+        }
+        
+        .calendar-day.unavailable.event {
+            background-color: #1A3B5C;
+            border: 2px solid #FFB800;
+            color: #FFFFFF;
+        }
+        
+        .calendar-day.other-month {
+            color: #C7C7CC;
+        }
+        
+        /* Légende */
+        .calendar-legend {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .calendar-legend h4 {
+            font-size: 16px;
+            color: #1A3B5C;
+            margin-bottom: 20px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 12px;
+            background: #F8F8F8;
+            border-radius: 12px;
+        }
+        
+        .legend-day-container {
+            position: relative;
+            margin-right: 15px;
+        }
+        
+        .legend-day {
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 25px;
+            position: relative;
+        }
+        
+        .legend-day.unavailable {
+            background-color: #1A3B5C;
+            color: #FFFFFF;
+        }
+        
+        .legend-day.event {
+            background-color: transparent;
+            border: 2px solid #FFB800;
+            color: #1A1A1A;
+        }
+        
+        .legend-day.event::after {
+            content: '';
+            position: absolute;
+            bottom: 3px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 4px;
+            background-color: #FFB800;
+            border-radius: 50%;
+        }
+        
+        .legend-day.unavailable.event {
+            background-color: #1A3B5C;
+            border: 2px solid #FFB800;
+            color: #FFFFFF;
+        }
+        
+        .legend-day.selected {
+            background-color: #FFB800;
+            color: #FFFFFF;
+        }
+        
+        .legend-text {
+            flex: 1;
+        }
+        
+        .legend-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1A3B5C;
+            margin-bottom: 2px;
+        }
+        
+        .legend-description {
+            font-size: 12px;
+            color: #666;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <div class="navigation">
+        <h4>Navigation rapide</h4>
+        <a href="#agenda">📅 Agenda</a>
+        <a href="#groups">👥 Groupes</a>
+        <a href="#events">🎉 Événements</a>
+        <a href="#notifications">🔔 Notifications</a>
+        <a href="#settings">⚙️ Réglages</a>
+    </div>
+
+    <h1>📱 Guide d'utilisation Créno</h1>
+    <p style="font-size: 1.2em; color: #666;">Documentation complète de l'application Créno organisée par onglet</p>
+
+    <h2 id="agenda">📅 Onglet Agenda</h2>
+    
+    <p>L'onglet Agenda est votre espace personnel pour gérer vos disponibilités. C'est ici que vous indiquez quand vous êtes disponible ou non pour participer aux événements de vos groupes.</p>
+    
+    <h3>Comprendre le calendrier</h3>
+    
+    <!-- Calendrier interactif -->
+    <div class="calendar-demo-container">
+        <div class="calendar-demo">
+            <div class="calendar-container">
+                <div class="calendar-header">
+                    <div class="calendar-nav-button" style="visibility: hidden;">‹</div>
+                    <div class="calendar-month-year">Janvier 2025</div>
+                    <div class="calendar-nav-button" style="visibility: hidden;">›</div>
+                </div>
+                
+                <div class="calendar-weekdays">
+                    <div class="weekday">DIM</div>
+                    <div class="weekday">LUN</div>
+                    <div class="weekday">MAR</div>
+                    <div class="weekday">MER</div>
+                    <div class="weekday">JEU</div>
+                    <div class="weekday">VEN</div>
+                    <div class="weekday">SAM</div>
+                </div>
+                
+                <div class="calendar-grid" id="calendar">
+                    <!-- Généré par JS -->
+                </div>
+            </div>
+        </div>
+        
+        <div class="calendar-legend">
+            <h4>Codes couleur du calendrier :</h4>
+            
+            <div class="legend-item">
+                <div class="legend-day-container">
+                    <div class="legend-day">15</div>
+                </div>
+                <div class="legend-text">
+                    <div class="legend-title">Jour disponible</div>
+                    <div class="legend-description">Aucune indisponibilité ni événement</div>
+                </div>
+            </div>
+            
+            <div class="legend-item">
+                <div class="legend-day-container">
+                    <div class="legend-day unavailable">8</div>
+                </div>
+                <div class="legend-text">
+                    <div class="legend-title">Indisponibilité</div>
+                    <div class="legend-description">Fond bleu = vous êtes indisponible</div>
+                </div>
+            </div>
+            
+            <div class="legend-item">
+                <div class="legend-day-container">
+                    <div class="legend-day event">15</div>
+                </div>
+                <div class="legend-text">
+                    <div class="legend-title">Événement</div>
+                    <div class="legend-description">Cercle jaune + point = événement planifié</div>
+                </div>
+            </div>
+            
+            <div class="legend-item">
+                <div class="legend-day-container">
+                    <div class="legend-day unavailable event">20</div>
+                </div>
+                <div class="legend-text">
+                    <div class="legend-title">Indispo + Événement</div>
+                    <div class="legend-description">Les deux en même temps</div>
+                </div>
+            </div>
+            
+            <div class="legend-item">
+                <div class="legend-day-container">
+                    <div class="legend-day selected">26</div>
+                </div>
+                <div class="legend-text">
+                    <div class="legend-title">Date sélectionnée</div>
+                    <div class="legend-description">Fond jaune = sélection actuelle</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h3>Ajouter une indisponibilité</h3>
+    <div class="step">
+        <span class="step-number">1</span>
+        <strong>Appuyez sur une date</strong> dans le calendrier pour la sélectionner
+    </div>
+    
+    <div class="step">
+        <span class="step-number">2</span>
+        <strong>Faites défiler vers le bas (scroll down)</strong> pour voir l'interface de création d'indisponibilité
+    </div>
+    
+    <div class="step">
+        <span class="step-number">3</span>
+        <strong>Sélectionnez vos heures d'indisponibilité :</strong>
+        <ul>
+            <li>Activez <strong>"Toute la journée"</strong> si vous êtes indisponible toute la journée</li>
+            <li>Ou définissez des <strong>heures spécifiques</strong> (ex: 14h00 - 18h00)</li>
+        </ul>
+    </div>
+    
+    <div class="step">
+        <span class="step-number">4</span>
+        <strong>Appuyez sur "Confirmer l'indisponibilité"</strong> - La date apparaîtra avec un fond bleu dans le calendrier
+    </div>
+
+    <h3>Interactions avec le calendrier</h3>
+    
+    <div class="ios-section">
+        <div class="ios-container">
+            <div class="ios-header">
+                <div class="ios-icon">📅</div>
+                <div class="ios-title">Jour avec événement</div>
+            </div>
+            <div class="ios-content">
+                Lorsque vous appuyez sur une date qui contient un événement (cercle jaune) et que vous faites défiler vers le bas, vous verrez le nom de l'événement.
+            </div>
+        </div>
+        
+        <div class="ios-container">
+            <div class="ios-header">
+                <div class="ios-icon">🔵</div>
+                <div class="ios-title">Jour avec indisponibilité</div>
+            </div>
+            <div class="ios-content">
+                Lorsque vous appuyez sur une date bleue (indisponibilité) et que vous faites défiler vers le bas, vous pouvez :
+                <ul class="ios-list">
+                    <li>Voir vos plages d'indisponibilité pour cette date</li>
+                    <li>Modifier ou supprimer une indisponibilité existante</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <h3>Gérer toutes vos indisponibilités</h3>
+    
+    <div class="ios-container">
+        <div class="ios-header">
+            <div class="ios-icon">📜</div>
+            <div class="ios-title">Liste complète de vos indisponibilités</div>
+        </div>
+        <div class="ios-content">
+            En descendant dans l'onglet Agenda (faites glisser vers le bas), vous accédez à la liste complète de toutes vos indisponibilités :
+            <ul class="ios-list">
+                <li>Elles sont classées par date (les plus proches en premier)</li>
+                <li>Chaque indisponibilité affiche la date et les horaires</li>
+                <li>Pour supprimer : Cliquez sur une indisponibilité pour la supprimer</li>
+                <li>Les indisponibilités passées sont automatiquement masquées</li>
+            </ul>
+        </div>
+    </div>
+
+
+    <h2 id="groups">👥 Onglet Groupes</h2>
+    
+    <p>L'onglet Groupes vous permet de gérer vos différents groupes d'amis, famille ou collègues. C'est ici que vous créez, rejoignez et gérez vos groupes.</p>
+    
+    <h3>Créer un groupe</h3>
+    <div class="step">
+        <span class="step-number">1</span>
+        <strong>Allez dans l'onglet "Groupes"</strong> (2ème icône)
+    </div>
+    
+    <div class="step">
+        <span class="step-number">2</span>
+        <strong>Appuyez sur "Changer"</strong> en haut de l'écran
+    </div>
+    
+    <div class="step">
+        <span class="step-number">3</span>
+        <strong>Appuyez sur "Gérer mes groupes"</strong>
+    </div>
+    
+    <div class="step">
+        <span class="step-number">4</span>
+        <strong>Appuyez sur "Créer un groupe"</strong>
+    </div>
+    
+    <div class="step">
+        <span class="step-number">5</span>
+        <strong>Donnez un nom à votre groupe</strong>
+        <ul>
+            <li>Exemple : "Famille", "Amis du lycée", "Équipe de foot"</li>
+            <li>Le nom doit être clair pour que vos amis le reconnaissent</li>
+        </ul>
+    </div>
+    
+    <div class="step">
+        <span class="step-number">6</span>
+        <strong>Appuyez sur "Créer"</strong> - Un code unique à 6 caractères sera généré
+    </div>
+    
+    <div class="step">
+        <span class="step-number">7</span>
+        <strong>Partagez le code du groupe</strong> avec vos amis pour qu'ils puissent rejoindre
+    </div>
+
+    <h3>Rejoindre un groupe</h3>
+    <div class="step">
+        <span class="step-number">1</span>
+        <strong>Allez dans l'onglet "Groupes"</strong>
+    </div>
+    
+    <div class="step">
+        <span class="step-number">2</span>
+        <strong>Appuyez sur "Changer"</strong> en haut de l'écran
+    </div>
+    
+    <div class="step">
+        <span class="step-number">3</span>
+        <strong>Appuyez sur "Gérer mes groupes"</strong>
+    </div>
+    
+    <div class="step">
+        <span class="step-number">4</span>
+        <strong>Appuyez sur "Rejoindre un groupe"</strong>
+    </div>
+    
+    <div class="step">
+        <span class="step-number">5</span>
+        <strong>Entrez le code du groupe</strong> (6 caractères) que votre ami vous a partagé
+    </div>
+    
+    <div class="step">
+        <span class="step-number">6</span>
+        <strong>Appuyez sur "Rejoindre"</strong> - Vous êtes maintenant membre !
+    </div>
+
+    <h2 id="events">🎉 Onglet Événements</h2>
+    
+    <p>L'onglet Événements centralise tous les événements de vos groupes. Vous y créez de nouveaux événements et consultez ceux existants.</p>
+    
+    <h3>Créer un événement</h3>
+    <div class="step">
+        <span class="step-number">1</span>
+        <strong>Appuyez sur le bouton "+"</strong> au centre de la barre de navigation
+    </div>
+    
+    <div class="step">
+        <span class="step-number">2</span>
+        <strong>Remplissez les informations :</strong>
+        <ul>
+            <li><strong>Titre</strong> : Nom de l'événement (ex: "Dîner d'anniversaire")</li>
+            <li><strong>Description</strong> : Détails supplémentaires (optionnel)</li>
+            <li><strong>Groupe</strong> : Sélectionnez le groupe concerné</li>
+            <li><strong>Date</strong> : Choisissez la date de l'événement</li>
+            <li><strong>Heure de début</strong> : Définissez l'heure</li>
+            <li><strong>Heure de fin</strong> : Définissez la durée</li>
+        </ul>
+    </div>
+    
+    <div class="step">
+        <span class="step-number">3</span>
+        <strong>Vérifiez les disponibilités</strong>
+        <ul>
+            <li>Un indicateur vous montre combien de personnes sont disponibles</li>
+            <li><span class="color-box" style="background-color: #4CAF50;"></span>Vert : Tout le monde est disponible</li>
+            <li><span class="color-box" style="background-color: #FFB800;"></span>Orange : Certains sont indisponibles</li>
+            <li><span class="color-box" style="background-color: #FF6B6B;"></span>Rouge : Beaucoup sont indisponibles</li>
+        </ul>
+    </div>
+    
+    <div class="step">
+        <span class="step-number">4</span>
+        <strong>Appuyez sur "Créer l'événement"</strong>
+    </div>
+
+    <h3>Trouver le meilleur créneau</h3>
+
+    <h3>Consulter un événement</h3>
+    <ol>
+        <li>Allez dans l'onglet <strong>"Événements"</strong> (4ème icône)</li>
+        <li>Vous verrez tous les événements du groupe (pas seulement ceux auxquels vous participez)</li>
+        <li>Appuyez sur un événement pour voir :
+            <ul>
+                <li>Les détails de l'événement</li>
+                <li>La liste des participants disponibles ✅</li>
+                <li>La liste des participants indisponibles ❌</li>
+                <li>Si vous êtes disponible ou non pour cet événement</li>
+            </ul>
+        </li>
+    </ol>
+
+    <h2 id="colors">🎨 Code des couleurs dans l'application</h2>
+    
+    <div class="feature-grid">
+        <div class="feature-card">
+            <div class="icon">📅</div>
+            <h4>Dans le calendrier</h4>
+            <ul>
+                <li><span class="color-box" style="background-color: #1A3B5C;"></span><strong>Fond bleu foncé</strong> : Indisponibilité</li>
+                <li><span class="color-box" style="display: inline-block; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #FFB800; position: relative; margin-right: 8px; vertical-align: middle;"><span style="position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; background-color: #FFB800; border-radius: 50%;"></span></span><strong>Cercle jaune + point</strong> : Vos événements</li>
+                <li><span class="color-box" style="background-color: #FFB800;"></span><strong>Fond jaune</strong> : Date sélectionnée</li>
+            </ul>
+        </div>
+        
+        <div class="feature-card">
+            <div class="icon">👥</div>
+            <h4>Dans la liste des événements</h4>
+            <ul>
+                <li><strong>Tous les événements</strong> : Vous voyez tous les événements du groupe</li>
+                <li><strong>Participants affichés</strong> : Nombre de personnes disponibles</li>
+            </ul>
+        </div>
+        
+        <div class="feature-card">
+            <div class="icon">🔔</div>
+            <h4>Notifications</h4>
+            <ul>
+                <li><span class="color-box" style="background-color: #E8F4F8;"></span><strong>Bleu</strong> : Non lue</li>
+                <li><span class="color-box" style="background-color: #FFFFFF;"></span><strong>Blanc</strong> : Lue</li>
+            </ul>
+        </div>
+    </div>
+
+    <h2 id="notifications">🔔 Notifications</h2>
+    
+    <h3>Types de notifications</h3>
+    <p>Créno vous envoie des notifications pour :</p>
+    <ul>
+        <li>📅 <strong>Nouveaux événements</strong> dans vos groupes</li>
+        <li>❌ <strong>Changements de disponibilité</strong> d'un participant</li>
+        <li>🗑️ <strong>Événements supprimés</strong></li>
+        <li>👥 <strong>Nouveaux membres</strong> dans vos groupes</li>
+    </ul>
+
+    <h3>Gérer les notifications</h3>
+    <div class="step">
+        <span class="step-number">1</span>
+        <strong>Allez dans "Réglages"</strong> (dernière icône)
+    </div>
+    
+    <div class="step">
+        <span class="step-number">2</span>
+        <strong>Appuyez sur "Notifications"</strong>
+    </div>
+    
+    <div class="step">
+        <span class="step-number">3</span>
+        <strong>Activez ou désactivez</strong> selon vos préférences
+    </div>
+
+
+
+    <h2>❓ Questions fréquentes</h2>
+    
+    <h3>Je ne reçois pas de notifications</h3>
+    <ol>
+        <li>Vérifiez que les notifications sont activées dans Créno (Réglages)</li>
+        <li>Vérifiez les réglages iOS : Réglages > Notifications > Créno</li>
+        <li>Assurez-vous d'avoir une connexion internet</li>
+    </ol>
+
+    <h3>Comment supprimer un groupe ?</h3>
+    <p>Seul le créateur du groupe peut le supprimer. Dans la page du groupe, appuyez sur les trois points en haut à droite puis "Supprimer le groupe".</p>
+
+    <h3>Puis-je modifier un événement après sa création ?</h3>
+    <p>Oui ! Le créateur de l'événement peut le modifier en appuyant dessus dans l'onglet "Événements" puis sur "Modifier".</p>
+
+    <h3>Comment quitter un groupe ?</h3>
+    <p>Dans la page du groupe, appuyez sur les trois points en haut à droite puis "Quitter le groupe".</p>
+
+    <h2>🆘 Besoin d'aide ?</h2>
+    <p>Si vous rencontrez un problème ou avez une question qui n'est pas couverte dans ce guide, n'hésitez pas à nous contacter !</p>
+    
+    <p>
+        📧 Email : support@creno.app<br>
+        🌐 Site web : www.creno.app
+    </p>
+
+    <hr style="margin-top: 60px; border: 1px solid #E0E0E0;">
+    <p style="text-align: center; color: #999; font-size: 0.9em;">
+        © 2024 Créno - Guide d'utilisation v1.0<br>
+        Dernière mise à jour : Janvier 2025
+    </p>
+    
+    <script>
+        // Générer le calendrier statique
+        function generateCalendar() {
+            const calendar = document.getElementById('calendar');
+            calendar.innerHTML = '';
+            
+            const year = 2025;
+            const month = 0; // Janvier
+            
+            // Premier jour du mois
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const daysInPrevMonth = new Date(year, month, 0).getDate();
+            
+            // Jours du mois précédent
+            for (let i = firstDay - 1; i >= 0; i--) {
+                const day = document.createElement('div');
+                day.className = 'calendar-day other-month';
+                day.textContent = daysInPrevMonth - i;
+                calendar.appendChild(day);
+            }
+            
+            // Jours du mois actuel
+            for (let i = 1; i <= daysInMonth; i++) {
+                const day = document.createElement('div');
+                day.className = 'calendar-day';
+                day.textContent = i;
+                
+                // Exemples par défaut
+                if (i === 8) day.classList.add('unavailable');
+                if (i === 15) day.classList.add('event');
+                if (i === 20) day.classList.add('unavailable', 'event');
+                if (i === 26) day.classList.add('selected');
+                
+                calendar.appendChild(day);
+            }
+            
+            // Jours du mois suivant
+            const remainingCells = 42 - (firstDay + daysInMonth);
+            for (let i = 1; i <= remainingCells; i++) {
+                const day = document.createElement('div');
+                day.className = 'calendar-day other-month';
+                day.textContent = i;
+                calendar.appendChild(day);
+            }
+        }
+        
+        // Initialiser
+        generateCalendar();
+    </script>
+</body>
+</html>

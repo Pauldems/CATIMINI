@@ -12,7 +12,6 @@ import {
   Animated,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import adMobService from '../../../services/adMobService';
 import {
   collection,
   query,
@@ -441,11 +440,6 @@ export default function CreateEventScreen({ navigation }: any) {
       }
 
       Alert.alert('Succès', 'Événement créé avec succès');
-      
-      // Afficher une pub interstitielle après création d'événement
-      setTimeout(() => {
-        adMobService.showInterstitial();
-      }, 1000);
       
       setShowSlotSelector(false);
       setSelectedSlot(null);

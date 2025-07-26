@@ -25,6 +25,7 @@ import { auth, db } from '../../../config/firebase';
 import { Friend, User, Event, Availability } from '../../../types';
 import { useCurrentGroup } from '../../../hooks/useCurrentGroup';
 import { Colors } from '../../../theme/colors';
+import notificationService from '../../../services/notificationService';
 
 interface EditEventScreenProps {
   navigation: any;
@@ -100,8 +101,8 @@ export default function EditEventScreen({ navigation, route }: EditEventScreenPr
         const unavailEndMinutes = unavailEndHour * 60 + unavailEndMin;
         
         // Vérifier le chevauchement
-        if (unavailStartMinutes < eventEndMinutes && unavailEndMinutes > eventStartMinutes) {
-          return true;
+        if (!(eventEndMinutes <= unavailStartMinutes || eventStartMinutes >= unavailEndMinutes)) {
+          return true; // Conflit trouvé
         }
       }
     }
@@ -109,73 +110,14 @@ export default function EditEventScreen({ navigation, route }: EditEventScreenPr
     return false;
   };
 
-  const toggleFriend = (friendId: string) => {
-    if (!selectedFriends.includes(friendId) && checkConflict(friendId)) {
-      Alert.alert(
-        'Participant indisponible',
-        'Cette personne a une indisponibilité qui entre en conflit avec l\'événement.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-    
-    setSelectedFriends((prev) =>
-      prev.includes(friendId)
-        ? prev.filter((id) => id !== friendId)
-        : [...prev, friendId]
-    );
-  };
-
-  const updateEventUnavailabilities = async (
-    eventId: string,
-    oldParticipants: string[],
-    newParticipants: string[],
-    newStartDate: Date,
-    newEndDate: Date,
-    newStartTime: string,
-    newEndTime: string
-  ) => {
-    try {
-      // Supprimer les anciennes indisponibilités créées par cet événement
-      const oldUnavailsQuery = query(
-        collection(db, 'availabilities'),
-        where('createdByEvent', '==', eventId)
-      );
-      const oldSnapshot = await getDocs(oldUnavailsQuery);
-      
-      const deletePromises = oldSnapshot.docs.map(doc => deleteDoc(doc.ref));
-      await Promise.all(deletePromises);
-      
-      // Créer les nouvelles indisponibilités pour tous les participants
-      const createPromises = newParticipants.map(async (participantId) => {
-        const currentDate = new Date(newStartDate);
-        const promises = [];
-        
-        while (currentDate <= newEndDate) {
-          const dateStr = currentDate.toISOString().split('T')[0];
-          
-          promises.push(addDoc(collection(db, 'availabilities'), {
-            userId: participantId,
-            date: dateStr,
-            startTime: newStartTime,
-            endTime: newEndTime,
-            isAvailable: false,
-            createdAt: new Date(),
-            createdByEvent: eventId,
-            groupId: currentGroup?.id,
-          }));
-          
-          currentDate.setDate(currentDate.getDate() + 1);
-        }
-        
-        return Promise.all(promises);
-      });
-      
-      await Promise.all(createPromises);
-    } catch (error) {
-      console.error('Erreur lors de la mise à jour des indisponibilités:', error);
-      throw error;
-    }
+  const toggleFriendSelection = (friendId: string) => {
+    setSelectedFriends(prev => {
+      if (prev.includes(friendId)) {
+        return prev.filter(id => id !== friendId);
+      } else {
+        return [...prev, friendId];
+      }
+    });
   };
 
   const handleSave = async () => {
@@ -184,138 +126,199 @@ export default function EditEventScreen({ navigation, route }: EditEventScreenPr
       return;
     }
 
-
     setLoading(true);
 
     try {
-      const newParticipants = [...selectedFriends, auth.currentUser!.uid];
-
+      const allParticipants = [auth.currentUser!.uid, ...selectedFriends];
+      
+      // Identifier les participants retirés
+      const removedParticipants = event.participants.filter(
+        participantId => participantId !== auth.currentUser!.uid && !selectedFriends.includes(participantId)
+      );
+      
       // Mettre à jour l'événement
       await updateDoc(doc(db, 'events', event.id), {
         title: title.trim(),
         description: description.trim(),
-        participants: newParticipants,
+        participants: allParticipants,
         updatedAt: new Date(),
       });
 
-      // Mettre à jour les indisponibilités seulement si les participants ont changé
-      if (JSON.stringify(event.participants.sort()) !== JSON.stringify(newParticipants.sort())) {
-        await updateEventUnavailabilities(
-          event.id,
-          event.participants,
-          newParticipants,
-          new Date(event.startDate),
-          new Date(event.endDate),
-          event.startTime,
-          event.endTime
-        );
+      // Gérer les indisponibilités pour les participants
+      await updateParticipantAvailabilities(allParticipants);
+      
+      // Envoyer des notifications aux participants retirés
+      if (removedParticipants.length > 0) {
+        for (const removedUserId of removedParticipants) {
+          await notificationService.sendNotification(
+            removedUserId,
+            'Retiré d\'un événement',
+            `Vous avez été retiré de l'événement : ${title.trim()}`,
+            'event_participant_removed',
+            {
+              eventId: event.id,
+              eventTitle: title.trim(),
+              groupId: currentGroup?.id
+            }
+          );
+        }
       }
 
-      Alert.alert('Succès', 'Événement modifié avec succès', [
-        { text: 'OK', onPress: () => navigation.goBack() }
-      ]);
-
+      Alert.alert('Succès', 'L\'événement a été modifié');
+      navigation.goBack();
     } catch (error) {
-      console.error('Erreur lors de la modification:', error);
+      console.error('Erreur modification événement:', error);
       Alert.alert('Erreur', 'Impossible de modifier l\'événement');
     } finally {
       setLoading(false);
     }
   };
 
+  const updateParticipantAvailabilities = async (participants: string[]) => {
+    // Supprimer les anciennes indisponibilités créées par cet événement
+    const oldAvailQuery = query(
+      collection(db, 'availabilities'),
+      where('createdByEvent', '==', event.id)
+    );
+    const oldAvailSnapshot = await getDocs(oldAvailQuery);
+    
+    for (const doc of oldAvailSnapshot.docs) {
+      await deleteDoc(doc.ref);
+    }
+
+    // Créer de nouvelles indisponibilités pour tous les participants
+    const eventStart = new Date(event.startDate);
+    const eventEnd = new Date(event.endDate);
+    
+    for (const userId of participants) {
+      for (let date = new Date(eventStart); date <= eventEnd; date.setDate(date.getDate() + 1)) {
+        const dateStr = date.toISOString().split('T')[0];
+        
+        await addDoc(collection(db, 'availabilities'), {
+          userId,
+          date: dateStr,
+          startTime: event.startTime,
+          endTime: event.endTime,
+          isAvailable: false,
+          createdByEvent: event.id,
+          createdAt: new Date(),
+        });
+      }
+    }
+  };
+
   const handleDelete = () => {
     Alert.alert(
       'Supprimer l\'événement',
-      'Êtes-vous sûr de vouloir supprimer cet événement ? Cette action est irréversible.',
+      'Êtes-vous sûr de vouloir supprimer cet événement ?',
       [
         { text: 'Annuler', style: 'cancel' },
         {
           text: 'Supprimer',
           style: 'destructive',
           onPress: async () => {
-            setLoading(true);
             try {
-              // Supprimer les indisponibilités créées par cet événement
-              const unavailsQuery = query(
+              // Supprimer toutes les indisponibilités créées par cet événement
+              const availQuery = query(
                 collection(db, 'availabilities'),
                 where('createdByEvent', '==', event.id)
               );
-              const snapshot = await getDocs(unavailsQuery);
+              const availSnapshot = await getDocs(availQuery);
               
-              const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
-              await Promise.all(deletePromises);
-              
+              for (const doc of availSnapshot.docs) {
+                await deleteDoc(doc.ref);
+              }
+
               // Supprimer l'événement
               await deleteDoc(doc(db, 'events', event.id));
               
-              Alert.alert('Succès', 'Événement supprimé avec succès', [
-                { text: 'OK', onPress: () => navigation.goBack() }
-              ]);
-              
+              Alert.alert('Succès', 'L\'événement a été supprimé');
+              navigation.navigate('Events');
             } catch (error) {
-              console.error('Erreur lors de la suppression:', error);
+              console.error('Erreur suppression événement:', error);
               Alert.alert('Erreur', 'Impossible de supprimer l\'événement');
-            } finally {
-              setLoading(false);
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
 
-
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={24} color={Colors.primary} />
-          </TouchableOpacity>
-          <Text style={styles.title}>Modifier l'événement</Text>
-          <TouchableOpacity onPress={handleDelete}>
-            <Ionicons name="trash" size={24} color="#FF3B30" />
-          </TouchableOpacity>
+      <View style={styles.header}>
+        <Text style={styles.title}>Modifier l'événement</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeButton}>
+          <Ionicons name="close" size={24} color="#1A3B5C" />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Informations</Text>
+          
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder="Titre de l'événement"
+              placeholderTextColor="rgba(26, 59, 92, 0.4)"
+              value={title}
+              onChangeText={setTitle}
+            />
+          </View>
+          
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.multilineInput}
+              placeholder="Description (optionnel)"
+              placeholderTextColor="rgba(26, 59, 92, 0.4)"
+              value={description}
+              onChangeText={setDescription}
+              multiline
+            />
+          </View>
         </View>
 
-        <View style={styles.form}>
-          <Text style={styles.label}>Titre</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Titre de l'événement"
-            value={title}
-            onChangeText={setTitle}
-          />
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Date et heure</Text>
+          
+          <View style={styles.dateTimeContainer}>
+            <View style={styles.dateTimeInfo}>
+              <Ionicons name="calendar-outline" size={20} color="#FFB800" />
+              <Text style={styles.dateTimeText}>
+                Du {new Date(event.startDate).toLocaleDateString('fr-FR')} au {new Date(event.endDate).toLocaleDateString('fr-FR')}
+              </Text>
+            </View>
+            
+            <View style={[styles.dateTimeInfo, { marginTop: 12 }]}>
+              <Ionicons name="time-outline" size={20} color="#FFB800" />
+              <Text style={styles.dateTimeText}>
+                De {event.startTime} à {event.endTime}
+              </Text>
+            </View>
+          </View>
+        </View>
 
-          <Text style={styles.label}>Description</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="Description (optionnelle)"
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            numberOfLines={3}
-          />
-
-
-          <Text style={styles.label}>Participants</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Participants ({selectedFriends.length + 1})</Text>
+          
           <View style={styles.friendsList}>
             {friends.map((friend) => (
               friend.friendData && (
                 <TouchableOpacity
-                  key={friend.friendData.id}
+                  key={friend.id}
                   style={[
                     styles.friendItem,
                     selectedFriends.includes(friend.friendData.id) && styles.selectedFriend,
-                    checkConflict(friend.friendData.id) && !selectedFriends.includes(friend.friendData.id) && styles.conflictFriend
+                    checkConflict(friend.friendData.id) && !selectedFriends.includes(friend.friendData.id) && styles.conflictFriend,
                   ]}
-                  onPress={() => toggleFriend(friend.friendData!.id)}
+                  onPress={() => toggleFriendSelection(friend.friendData.id)}
                 >
                   <View style={styles.friendContent}>
                     <Text style={[
                       styles.friendName,
                       selectedFriends.includes(friend.friendData.id) && styles.selectedFriendText,
-                      checkConflict(friend.friendData.id) && !selectedFriends.includes(friend.friendData.id) && styles.conflictFriendText
+                      checkConflict(friend.friendData.id) && !selectedFriends.includes(friend.friendData.id) && styles.conflictFriendText,
                     ]}>
                       {friend.friendData.displayName}
                     </Text>
@@ -324,25 +327,34 @@ export default function EditEventScreen({ navigation, route }: EditEventScreenPr
                     )}
                   </View>
                   {selectedFriends.includes(friend.friendData.id) && (
-                    <Ionicons name="checkmark" size={20} color={Colors.primary} />
+                    <View style={styles.checkIcon}>
+                      <Ionicons name="checkmark" size={16} color="#1A3B5C" />
+                    </View>
                   )}
                 </TouchableOpacity>
               )
             ))}
           </View>
-
-          <TouchableOpacity
-            style={[styles.saveButton, loading && styles.disabledButton]}
-            onPress={handleSave}
-            disabled={loading}
-          >
-            <Text style={styles.saveButtonText}>
-              {loading ? 'Modification...' : 'Sauvegarder'}
-            </Text>
-          </TouchableOpacity>
         </View>
-      </ScrollView>
 
+        <TouchableOpacity
+          style={[styles.saveButton, loading && styles.disabledButton]}
+          onPress={handleSave}
+          disabled={loading}
+        >
+          <Text style={styles.saveButtonText}>
+            {loading ? 'Modification...' : 'Sauvegarder les modifications'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={handleDelete}
+        >
+          <Ionicons name="trash-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+          <Text style={styles.deleteButtonText}>Supprimer l'événement</Text>
+        </TouchableOpacity>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -350,91 +362,139 @@ export default function EditEventScreen({ navigation, route }: EditEventScreenPr
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#FAFAFA',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 24,
+    backgroundColor: '#FAFAFA',
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#1A3B5C',
+    letterSpacing: 0.5,
   },
-  form: {
-    padding: 20,
+  closeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(26, 59, 92, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 8,
-    marginTop: 16,
+  content: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  
+  // Sections avec style iOS
+  section: {
+    marginBottom: 32,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFB800',
+    marginBottom: 16,
+    marginLeft: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+  },
+  
+  // Input containers avec effet flottant
+  inputContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    marginBottom: 12,
+    shadowColor: '#1A3B5C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+    borderWidth: 0,
   },
   input: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
+    fontSize: 17,
+    color: '#1A3B5C',
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
-  textArea: {
-    height: 80,
+  multilineInput: {
+    minHeight: 100,
     textAlignVertical: 'top',
+    fontSize: 17,
+    color: '#1A3B5C',
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
-  dateButton: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  
+  // Container pour date/heure avec style card
+  dateTimeContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#1A3B5C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  dateTimeInfo: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
   },
-  dateText: {
+  dateTimeText: {
     fontSize: 16,
-    color: '#000',
+    color: '#1A3B5C',
+    fontWeight: '600',
+    marginLeft: 12,
   },
+  
+  // Liste des amis
   friendsList: {
-    marginTop: 8,
+    marginTop: 0,
   },
   friendItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderRadius: 18,
+    marginBottom: 12,
+    shadowColor: '#1A3B5C',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
   selectedFriend: {
-    backgroundColor: '#E3F2FD',
-    borderColor: Colors.primary,
+    backgroundColor: '#1A3B5C',
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
   },
   friendName: {
     fontSize: 16,
-    color: '#000',
+    color: '#1A3B5C',
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
   selectedFriendText: {
-    color: Colors.primary,
-    fontWeight: '600',
+    color: '#FFFFFF',
   },
   conflictFriend: {
-    backgroundColor: '#FFF3E0',
-    borderColor: '#FF9500',
+    backgroundColor: 'rgba(255, 184, 0, 0.1)',
+    borderWidth: 1.5,
+    borderColor: '#FFB800',
   },
   conflictFriendText: {
     color: '#FF9500',
@@ -445,21 +505,61 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   warningIcon: {
-    marginLeft: 6,
+    marginLeft: 8,
   },
-  saveButton: {
-    backgroundColor: Colors.primary,
+  checkIcon: {
+    width: 24,
+    height: 24,
     borderRadius: 12,
-    paddingVertical: 16,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 24,
+  },
+  
+  // Bouton de sauvegarde avec style premium
+  saveButton: {
+    backgroundColor: '#1A3B5C',
+    borderRadius: 20,
+    paddingVertical: 18,
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 16,
+    shadowColor: '#1A3B5C',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
   },
   disabledButton: {
-    backgroundColor: '#8E8E93',
+    backgroundColor: 'rgba(142, 142, 147, 0.6)',
+    shadowOpacity: 0.1,
   },
   saveButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  
+  // Bouton supprimer
+  deleteButton: {
+    backgroundColor: '#FF6B6B',
+    borderRadius: 20,
+    paddingVertical: 18,
+    alignItems: 'center',
+    marginBottom: 40,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    shadowColor: '#FF6B6B',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  deleteButtonText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
 });

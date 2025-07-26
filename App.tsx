@@ -41,8 +41,8 @@ import { FriendsScreen, SettingsScreen } from './src/features/profile/screens';
 
 // Services
 import notificationService from './src/services/notificationService';
-import adMobService from './src/services/adMobService';
 import premiumService from './src/services/premiumService';
+import storeKitService from './src/services/storeKitService';
 
 // Components
 import { CustomTabBar } from './src/components';
@@ -195,6 +195,12 @@ export default function App() {
   // useCleanup();
 
   useEffect(() => {
+    // Timeout de sécurité pour éviter le blocage infini
+    const timeoutId = setTimeout(() => {
+      console.error('⏰ TIMEOUT: Forçage de fin de chargement après 10s');
+      setLoading(false);
+    }, 10000);
+
     // Vérifier s'il y a un utilisateur en cache
     const checkPersistedUser = async () => {
       try {
@@ -225,14 +231,53 @@ export default function App() {
           displayName: user.displayName
         }));
         
-        // Initialiser les services
-        premiumService.initialize();
-        adMobService.initialize();
-        adMobService.showLaunchAd();
+        // Initialiser les services une seule fois
+        if (!user.uid || user.uid !== auth.currentUser?.uid) {
+          console.log('🔑 [App] Skip init - user mismatch');
+          return;
+        }
         
-        // Initialiser les notifications après connexion (avec délai pour inscription)
-        setTimeout(async () => {
+        console.log('🔑 [App] Initialisation des services...');
+        
+        // Initialiser StoreKit avec gestion d'erreur
+        const initStoreKit = async () => {
           try {
+            console.log('🔑 [App] Début init StoreKit');
+            await storeKitService.initialize();
+            console.log('🔑 [App] StoreKit initialisé');
+          } catch (error) {
+            console.error('🔑 [App] Erreur StoreKit (non bloquante):', error);
+          }
+        };
+        
+        // Initialiser le service premium
+        const initPremium = async () => {
+          try {
+            console.log('🔑 [App] Début init Premium');
+            await premiumService.initialize();
+            console.log('🔑 [App] Premium initialisé');
+          } catch (error) {
+            console.error('🔑 [App] Erreur Premium Service:', error);
+          }
+        };
+        
+        // Lancer les initialisations
+        Promise.all([initStoreKit(), initPremium()]).then(() => {
+          console.log('🔑 [App] Tous les services sont initialisés');
+        });
+        
+        // Initialiser les notifications de manière sécurisée
+        const initializeNotifications = async () => {
+          try {
+            // Attendre que l'app soit prête
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Vérifier que l'utilisateur est toujours connecté
+            if (!auth.currentUser) {
+              console.log('🔑 [App] User disconnected, skipping notifications init');
+              return;
+            }
+            
             await notificationService.initialize();
             
             // Configurer les listeners de notifications
@@ -264,18 +309,26 @@ export default function App() {
             };
           } catch (error) {
             console.error('Erreur notifications:', error);
+            // Ne pas faire crasher l'app si les notifications échouent
           }
-        }, 2000); // 2 secondes pour que le document Firestore soit créé
+        };
+        
+        // Lancer l'initialisation sans await pour ne pas bloquer
+        initializeNotifications();
       } else {
         console.log('🔑 [App] Removing user from AsyncStorage');
         await AsyncStorage.removeItem('user');
       }
       
       console.log('🔑 [App] Setting loading to false');
+      console.log('🔑 [App] Fin du chargement - setLoading(false)');
       setLoading(false);
     });
 
-    return unsubscribe;
+    return () => {
+      clearTimeout(timeoutId);
+      unsubscribe();
+    };
   }, []);
 
   if (loading) {

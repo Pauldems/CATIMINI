@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guide Interactif - Créno</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+            background-color: #F2F2F7;
+            color: #1A3B5C;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1 {
+            color: #1A3B5C;
+            font-size: 34px;
+            font-weight: 700;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        h2 {
+            color: #1A3B5C;
+            font-size: 28px;
+            font-weight: 600;
+            margin: 40px 0 20px;
+        }
+        
+        /* Section Interactive */
+        .interactive-section {
+            display: grid;
+            grid-template-columns: 375px 1fr;
+            gap: 40px;
+            margin: 40px 0;
+            align-items: start;
+        }
+        
+        @media (max-width: 900px) {
+            .interactive-section {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        /* iPhone Mockup - Plus réaliste */
+        .iphone-container {
+            position: sticky;
+            top: 20px;
+        }
+        
+        .iphone-mockup {
+            width: 375px;
+            height: 812px;
+            background: #000;
+            border-radius: 40px;
+            padding: 3px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+        }
+        
+        .iphone-screen {
+            width: 100%;
+            height: 100%;
+            background: #FAFAFA;
+            border-radius: 37px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        /* Status Bar iOS */
+        .status-bar {
+            height: 44px;
+            background: #FAFAFA;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 30px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .status-time {
+            color: #000;
+        }
+        
+        .status-icons {
+            display: flex;
+            gap: 5px;
+        }
+        
+        /* Header de l'app */
+        .app-header {
+            background: #FFFFFF;
+            padding: 10px 0;
+            text-align: center;
+            border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
+        }
+        
+        .app-title {
+            font-size: 24px;
+            font-weight: 300;
+            color: #1A3B5C;
+            letter-spacing: 0.5px;
+        }
+        
+        /* Calendar Container */
+        .calendar-container {
+            background: #FFFFFF;
+            margin: 20px;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+        
+        /* Calendar Header avec navigation */
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .calendar-nav-button {
+            width: 30px;
+            height: 30px;
+            border: none;
+            background: none;
+            color: #FFB800;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .calendar-month-year {
+            font-size: 17px;
+            font-weight: 600;
+            color: #1A3B5C;
+        }
+        
+        /* Weekdays */
+        .calendar-weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            margin-bottom: 10px;
+        }
+        
+        .weekday {
+            text-align: center;
+            font-size: 11px;
+            font-weight: 600;
+            color: #8E8E93;
+            text-transform: uppercase;
+            padding: 5px 0;
+        }
+        
+        /* Calendar Grid */
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+        }
+        
+        .calendar-day {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+            color: #1A1A1A;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            width: 35px;
+            height: 35px;
+            margin: 0 auto;
+        }
+        
+        /* États du calendrier - EXACT comme l'app */
+        
+        /* Jour normal */
+        .calendar-day:active {
+            transform: scale(0.95);
+        }
+        
+        /* Jour sélectionné - Fond jaune */
+        .calendar-day.selected {
+            background-color: #FFB800;
+            color: #FFFFFF;
+        }
+        
+        /* Indisponibilité - Fond bleu foncé */
+        .calendar-day.unavailable {
+            background-color: #1A3B5C;
+            color: #FFFFFF;
+        }
+        
+        /* Événement - Cercle jaune + dot */
+        .calendar-day.event {
+            background-color: transparent;
+            border: 2px solid #FFB800;
+            color: #1A1A1A;
+        }
+        
+        .calendar-day.event::after {
+            content: '';
+            position: absolute;
+            bottom: 3px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 4px;
+            background-color: #FFB800;
+            border-radius: 50%;
+        }
+        
+        /* Indispo + Événement - Fond bleu + cercle jaune + dot */
+        .calendar-day.unavailable.event {
+            background-color: #1A3B5C;
+            border: 2px solid #FFB800;
+            color: #FFFFFF;
+        }
+        
+        /* Autre mois */
+        .calendar-day.other-month {
+            color: #C7C7CC;
+        }
+        
+        /* Info Button */
+        .info-button {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 24px;
+            height: 24px;
+            border: none;
+            background: none;
+            color: #1A3B5C;
+            font-size: 20px;
+            cursor: pointer;
+        }
+        
+        /* Bottom Sheet */
+        .bottom-sheet {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #FFFFFF;
+            border-radius: 20px 20px 0 0;
+            padding: 20px;
+            box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .sheet-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .sheet-date {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1A3B5C;
+        }
+        
+        .add-unavailability-button {
+            background-color: #FFB800;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        /* Légende et instructions */
+        .guide-section {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+        
+        .legend {
+            margin-top: 30px;
+        }
+        
+        .legend h3 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1A3B5C;
+            margin-bottom: 20px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #F8F8F8;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .legend-item:hover {
+            background: #F0F0F0;
+            transform: translateX(5px);
+        }
+        
+        .legend-item.active {
+            background: #E8F4F8;
+            border-left: 3px solid #FFB800;
+        }
+        
+        .legend-day-container {
+            position: relative;
+            margin-right: 20px;
+        }
+        
+        .legend-day {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 25px;
+            position: relative;
+        }
+        
+        /* Copier les mêmes styles que le calendrier */
+        .legend-day.unavailable {
+            background-color: #1A3B5C;
+            color: #FFFFFF;
+        }
+        
+        .legend-day.event {
+            background-color: transparent;
+            border: 2px solid #FFB800;
+            color: #1A1A1A;
+        }
+        
+        .legend-day.event::after {
+            content: '';
+            position: absolute;
+            bottom: 3px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 4px;
+            background-color: #FFB800;
+            border-radius: 50%;
+        }
+        
+        .legend-day.unavailable.event {
+            background-color: #1A3B5C;
+            border: 2px solid #FFB800;
+            color: #FFFFFF;
+        }
+        
+        .legend-day.selected {
+            background-color: #FFB800;
+            color: #FFFFFF;
+        }
+        
+        .legend-text {
+            flex: 1;
+        }
+        
+        .legend-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1A3B5C;
+            margin-bottom: 4px;
+        }
+        
+        .legend-description {
+            font-size: 14px;
+            color: #666;
+            line-height: 1.4;
+        }
+        
+        /* Instructions */
+        .instructions {
+            background: #FFB800;
+            color: white;
+            padding: 20px;
+            border-radius: 16px;
+            margin-bottom: 30px;
+        }
+        
+        .instructions h3 {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        
+        .instructions p {
+            font-size: 14px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 Guide Interactif Créno</h1>
+        
+        <div class="interactive-section">
+            <!-- iPhone Mockup Réaliste -->
+            <div class="iphone-container">
+                <div class="iphone-mockup">
+                    <div class="iphone-screen">
+                        <!-- Status Bar iOS -->
+                        <div class="status-bar">
+                            <div class="status-time">9:41</div>
+                            <div class="status-icons">
+                                <span>📶</span>
+                                <span>📶</span>
+                                <span>🔋</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Header App -->
+                        <div class="app-header">
+                            <div class="app-title">Agenda</div>
+                        </div>
+                        
+                        <!-- Calendar -->
+                        <div class="calendar-container">
+                            <button class="info-button">ℹ️</button>
+                            
+                            <div class="calendar-header">
+                                <button class="calendar-nav-button">‹</button>
+                                <div class="calendar-month-year">Janvier 2025</div>
+                                <button class="calendar-nav-button">›</button>
+                            </div>
+                            
+                            <div class="calendar-weekdays">
+                                <div class="weekday">DIM</div>
+                                <div class="weekday">LUN</div>
+                                <div class="weekday">MAR</div>
+                                <div class="weekday">MER</div>
+                                <div class="weekday">JEU</div>
+                                <div class="weekday">VEN</div>
+                                <div class="weekday">SAM</div>
+                            </div>
+                            
+                            <div class="calendar-grid" id="calendar">
+                                <!-- Généré par JS -->
+                            </div>
+                        </div>
+                        
+                        <!-- Bottom Sheet -->
+                        <div class="bottom-sheet">
+                            <div class="sheet-header">
+                                <div class="sheet-date">Dimanche 26 janvier 2025</div>
+                                <button class="add-unavailability-button">+ Indisponibilité</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Guide Section -->
+            <div class="guide-section">
+                <div class="instructions">
+                    <h3>🎯 Comment utiliser ce guide</h3>
+                    <p>Cliquez sur les exemples ci-dessous pour voir comment les différents états apparaissent dans le calendrier. Cela vous aidera à comprendre rapidement les codes couleur de l'application.</p>
+                </div>
+                
+                <div class="legend">
+                    <h3>Comprendre les codes couleur</h3>
+                    
+                    <div class="legend-item" onclick="showExample('normal')">
+                        <div class="legend-day-container">
+                            <div class="legend-day">15</div>
+                        </div>
+                        <div class="legend-text">
+                            <div class="legend-title">Jour disponible</div>
+                            <div class="legend-description">Vous n'avez aucune indisponibilité ni événement ce jour</div>
+                        </div>
+                    </div>
+                    
+                    <div class="legend-item" onclick="showExample('unavailable')">
+                        <div class="legend-day-container">
+                            <div class="legend-day unavailable">15</div>
+                        </div>
+                        <div class="legend-text">
+                            <div class="legend-title">Indisponibilité</div>
+                            <div class="legend-description">Fond bleu foncé = vous êtes indisponible ce jour</div>
+                        </div>
+                    </div>
+                    
+                    <div class="legend-item" onclick="showExample('event')">
+                        <div class="legend-day-container">
+                            <div class="legend-day event">15</div>
+                        </div>
+                        <div class="legend-text">
+                            <div class="legend-title">Événement planifié</div>
+                            <div class="legend-description">Cercle jaune + point jaune = un événement où vous participez</div>
+                        </div>
+                    </div>
+                    
+                    <div class="legend-item" onclick="showExample('both')">
+                        <div class="legend-day-container">
+                            <div class="legend-day unavailable event">15</div>
+                        </div>
+                        <div class="legend-text">
+                            <div class="legend-title">Indisponibilité + Événement</div>
+                            <div class="legend-description">Fond bleu + cercle jaune = vous êtes indisponible ET avez un événement</div>
+                        </div>
+                    </div>
+                    
+                    <div class="legend-item" onclick="showExample('selected')">
+                        <div class="legend-day-container">
+                            <div class="legend-day selected">15</div>
+                        </div>
+                        <div class="legend-text">
+                            <div class="legend-title">Date sélectionnée</div>
+                            <div class="legend-description">Fond jaune = date actuellement sélectionnée</div>
+                        </div>
+                    </div>
+                    
+                </div>
+                
+                <div style="margin-top: 30px; padding: 20px; background: #F8F8F8; border-radius: 12px;">
+                    <h4 style="margin-bottom: 10px; color: #1A3B5C;">💡 Bon à savoir</h4>
+                    <ul style="margin: 0; padding-left: 20px; color: #666;">
+                        <li>Les indisponibilités s'appliquent à tous vos groupes</li>
+                        <li>Vous pouvez avoir plusieurs événements le même jour</li>
+                        <li>Les événements affichés sont ceux de votre groupe actuel</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Générer le calendrier
+        function generateCalendar() {
+            const calendar = document.getElementById('calendar');
+            const year = 2025;
+            const month = 0; // Janvier
+            
+            // Premier jour du mois
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const daysInPrevMonth = new Date(year, month, 0).getDate();
+            
+            // Jours du mois précédent
+            for (let i = firstDay - 1; i >= 0; i--) {
+                const day = document.createElement('div');
+                day.className = 'calendar-day other-month';
+                day.textContent = daysInPrevMonth - i;
+                calendar.appendChild(day);
+            }
+            
+            // Jours du mois actuel
+            for (let i = 1; i <= daysInMonth; i++) {
+                const day = document.createElement('div');
+                day.className = 'calendar-day';
+                day.textContent = i;
+                day.id = `day-${i}`;
+                
+                // Exemples par défaut
+                if (i === 8) day.classList.add('unavailable');
+                if (i === 15) day.classList.add('event');
+                if (i === 20) day.classList.add('unavailable', 'event');
+                if (i === 12) day.classList.add('selected');
+                
+                day.onclick = () => selectDay(i);
+                calendar.appendChild(day);
+            }
+            
+            // Jours du mois suivant
+            const remainingCells = 42 - (firstDay + daysInMonth);
+            for (let i = 1; i <= remainingCells; i++) {
+                const day = document.createElement('div');
+                day.className = 'calendar-day other-month';
+                day.textContent = i;
+                calendar.appendChild(day);
+            }
+        }
+        
+        // Sélectionner un jour
+        function selectDay(dayNumber) {
+            // Retirer la sélection précédente
+            document.querySelectorAll('.calendar-day.selected').forEach(day => {
+                if (!day.classList.contains('example-day')) {
+                    day.classList.remove('selected');
+                }
+            });
+            
+            // Ajouter la sélection
+            const day = document.getElementById(`day-${dayNumber}`);
+            if (day && !day.classList.contains('other-month')) {
+                day.classList.add('selected');
+                updateBottomSheet(dayNumber);
+            }
+        }
+        
+        // Mettre à jour le bottom sheet
+        function updateBottomSheet(day) {
+            const date = new Date(2025, 0, day);
+            const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+            const dateStr = date.toLocaleDateString('fr-FR', options);
+            document.querySelector('.sheet-date').textContent = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+        }
+        
+        // Montrer un exemple
+        function showExample(type) {
+            // Reset legend items
+            document.querySelectorAll('.legend-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+            
+            // Reset le jour 15
+            const day15 = document.getElementById('day-15');
+            day15.className = 'calendar-day example-day';
+            
+            // Appliquer le style
+            switch(type) {
+                case 'normal':
+                    // Rien à ajouter
+                    break;
+                case 'unavailable':
+                    day15.classList.add('unavailable');
+                    break;
+                case 'event':
+                    day15.classList.add('event');
+                    break;
+                case 'both':
+                    day15.classList.add('unavailable', 'event');
+                    break;
+                case 'selected':
+                    day15.classList.add('selected');
+                    break;
+            }
+        }
+        
+        // Initialiser
+        generateCalendar();
+    </script>
+</body>
+</html>

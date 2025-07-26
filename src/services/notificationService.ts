@@ -36,7 +36,7 @@ class NotificationService {
       if (Device.isDevice && auth.currentUser) {
         try {
           const token = await Notifications.getExpoPushTokenAsync({
-            projectId: 'e12fe417-6270-48c6-b2f1-444535f037cb', // Votre EAS project ID
+            projectId: '692d5872-558a-420c-95c5-ddb29f0a3e8d', // Votre EAS project ID
           });
           
           console.log('📱 [NotificationService] Expo Push Token:', token.data);
@@ -95,6 +95,28 @@ class NotificationService {
 
     await Promise.all(promises);
     console.log('Toutes les notifications ont été créées');
+  }
+
+  async sendNotification(
+    userId: string,
+    title: string,
+    message: string,
+    type: string,
+    data?: any
+  ): Promise<void> {
+    try {
+      await this.createNotification({
+        userId,
+        type,
+        title,
+        message,
+        read: false,
+        ...data
+      });
+    } catch (error) {
+      console.error('Error sending notification:', error);
+      throw error;
+    }
   }
 
   async createUnavailabilityNotification(

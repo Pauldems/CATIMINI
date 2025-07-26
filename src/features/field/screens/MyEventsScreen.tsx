@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from '../../../config/firebase';
-import { AdBanner } from '../../../components/AdBanner';
 import { 
   collection, 
   query, 
@@ -289,9 +288,15 @@ const MyEventsScreen: React.FC<MyEventsScreenProps> = ({ navigation }) => {
     const endDate = new Date(item.endDate);
     const isMultiDay = startDate.toDateString() !== endDate.toDateString();
     
-    // Vérifier si l'événement est terminé
+    // Vérifier si l'événement est terminé en prenant en compte l'heure
     const now = new Date();
-    const isFinished = endDate < now;
+    
+    // Créer une date complète avec l'heure de fin
+    const eventEndDateTime = new Date(endDate);
+    const [endHour, endMinute] = item.endTime.split(':').map(Number);
+    eventEndDateTime.setHours(endHour, endMinute, 0, 0);
+    
+    const isFinished = eventEndDateTime < now;
     
     return (
       <TouchableOpacity
@@ -362,8 +367,6 @@ const MyEventsScreen: React.FC<MyEventsScreenProps> = ({ navigation }) => {
           {events.length} événement{events.length > 1 ? 's' : ''}
         </Text>
       </View>
-
-      <AdBanner />
 
       <FlatList
         ref={flatListRef}

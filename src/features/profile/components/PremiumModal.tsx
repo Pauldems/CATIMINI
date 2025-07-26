@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -26,29 +26,68 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({
   onUpgrade
 }) => {
   const [loading, setLoading] = useState(false);
+  const [price, setPrice] = useState('2,00 €');
+
+  useEffect(() => {
+    // Charger le prix depuis RevenueCat
+    const loadPrice = async () => {
+      const priceString = await premiumService.getSubscriptionPrice();
+      setPrice(priceString);
+    };
+    loadPrice();
+  }, []);
 
   const handleUpgrade = async () => {
     setLoading(true);
     try {
-      // Pour l'instant, on simule l'achat (à remplacer par vraie logique de paiement)
-      await premiumService.activatePremium(1); // 1 mois
-      
-      Alert.alert(
-        '🎉 Premium activé !',
-        'Vous êtes maintenant premium ! Profitez de vos indisponibilités illimitées et d\'une expérience sans publicité.',
-        [
-          { 
-            text: 'Parfait !', 
-            onPress: () => {
-              onUpgrade();
-              onClose();
-            }
-          }
-        ]
-      );
+      const success = await premiumService.activatePremium();
+      if (success) {
+        Alert.alert(
+          '🎉 Félicitations !',
+          'Vous êtes maintenant Premium. Profitez de toutes les fonctionnalités illimitées !',
+          [{ text: 'Super !', onPress: () => {
+            onUpgrade();
+            onClose();
+          }}]
+        );
+      }
     } catch (error) {
-      console.error('Erreur activation premium:', error);
-      Alert.alert('Erreur', 'Impossible d\'activer le premium. Réessayez plus tard.');
+      Alert.alert(
+        'Erreur',
+        'Une erreur est survenue lors de l\'achat. Veuillez réessayer.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleRestore = async () => {
+    setLoading(true);
+    try {
+      const restored = await premiumService.restorePurchases();
+      if (restored) {
+        Alert.alert(
+          '✅ Restauration réussie',
+          'Vos achats ont été restaurés avec succès.',
+          [{ text: 'OK', onPress: () => {
+            onUpgrade();
+            onClose();
+          }}]
+        );
+      } else {
+        Alert.alert(
+          'Aucun achat trouvé',
+          'Aucun achat antérieur n\'a été trouvé pour ce compte.',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      Alert.alert(
+        'Erreur',
+        'Une erreur est survenue lors de la restauration. Veuillez réessayer.',
+        [{ text: 'OK' }]
+      );
     } finally {
       setLoading(false);
     }
@@ -64,11 +103,6 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({
       icon: 'people',
       title: 'Groupes illimités',
       description: 'Créez et rejoignez autant de groupes que vous voulez'
-    },
-    {
-      icon: 'close-circle',
-      title: 'Zéro publicité',
-      description: 'Profitez de l\'app sans interruption'
     },
     {
       icon: 'heart',
@@ -141,7 +175,7 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({
                 {/* Pricing */}
                 <View style={styles.pricingContainer}>
                   <View style={styles.priceCard}>
-                    <Text style={styles.priceAmount}>2€</Text>
+                    <Text style={styles.priceAmount}>{price.split(' ')[0]}</Text>
                     <Text style={styles.pricePeriod}>par mois</Text>
                   </View>
                   <Text style={styles.pricingNote}>
@@ -166,6 +200,17 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({
                     </>
                   )}
                 </TouchableOpacity>
+                
+                {/* Restore Button */}
+                <TouchableOpacity
+                  style={styles.restoreButton}
+                  onPress={handleRestore}
+                  disabled={loading}
+                >
+                  <Text style={styles.restoreButtonText}>
+                    Restaurer mes achats
+                  </Text>
+                </TouchableOpacity>
               </>
             )}
 
@@ -186,11 +231,6 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({
                   <Text style={styles.comparisonPremium}>Illimités ✨</Text>
                 </View>
                 
-                <View style={styles.comparisonRow}>
-                  <Text style={styles.comparisonFeature}>Publicités</Text>
-                  <Text style={styles.comparisonFree}>Oui</Text>
-                  <Text style={styles.comparisonPremium}>Aucune ✨</Text>
-                </View>
                 
                 <View style={styles.comparisonRow}>
                   <Text style={styles.comparisonFeature}>Support prioritaire</Text>
@@ -348,6 +388,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
     marginLeft: 8,
+  },
+  restoreButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    marginBottom: 24,
+  },
+  restoreButtonText: {
+    color: '#FFB800',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    textDecorationLine: 'underline',
   },
   comparisonContainer: {
     paddingHorizontal: 24,
