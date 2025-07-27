@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, Linking, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Linking, ScrollView, ActivityIndicator } from 'react-native';
 import { auth } from '../../../config/firebase';
 import { signOut } from 'firebase/auth';
 import { DeleteAccountModal } from '../components/DeleteAccountModal';
@@ -7,6 +7,7 @@ import { PremiumModal } from '../components/PremiumModal';
 import * as Notifications from 'expo-notifications';
 import { Colors } from '../../../theme/colors';
 import premiumService from '../../../services/premiumService';
+import storeKitService from '../../../services/storeKitService';
 import { Ionicons } from '@expo/vector-icons';
 
 interface SettingsScreenProps {
@@ -19,10 +20,19 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
+  const [checkingPremium, setCheckingPremium] = useState(true);
 
   useEffect(() => {
     checkNotificationStatus();
     checkPremiumStatus();
+    
+    // Configurer un rafraîchissement toutes les 30 secondes
+    const interval = setInterval(() => {
+      checkPremiumStatus();
+    }, 30000); // 30 secondes
+    
+    setRefreshInterval(interval);
     
     // Listener pour rafraîchir le statut quand on revient sur l'écran
     const unsubscribe = navigation.addListener('focus', () => {
@@ -35,7 +45,12 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       // }
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+    };
   }, [navigation]);
 
   const checkNotificationStatus = async () => {
@@ -48,8 +63,17 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   };
 
   const checkPremiumStatus = async () => {
-    const premium = await premiumService.checkPremiumStatus();
-    setIsPremium(premium);
+    try {
+      setCheckingPremium(true);
+      const premium = await premiumService.checkPremiumStatus();
+      console.log('🎯 Statut premium dans SettingsScreen:', premium);
+      setIsPremium(premium);
+    } catch (error) {
+      console.error('Erreur vérification premium dans Settings:', error);
+      setIsPremium(false);
+    } finally {
+      setCheckingPremium(false);
+    }
   };
 
   const handleToggleNotifications = async () => {
@@ -117,16 +141,23 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
             isPremium ? styles.premiumActiveButton : styles.premiumButton
           ]}
           onPress={() => setShowPremiumModal(true)}
+          disabled={checkingPremium}
         >
           <View style={styles.premiumButtonContent}>
-            <Ionicons 
-              name="star" 
-              size={20} 
-              color={isPremium ? '#FFD700' : '#FFB800'} 
-            />
-            <Text style={[styles.buttonText, styles.premiumButtonText]}>
-              {isPremium ? 'Créno Premium actif' : 'Passer à Premium'}
-            </Text>
+            {checkingPremium ? (
+              <ActivityIndicator size="small" color={isPremium ? '#4CAF50' : '#FFB800'} />
+            ) : (
+              <>
+                <Ionicons 
+                  name="star" 
+                  size={20} 
+                  color={isPremium ? '#FFD700' : '#FFB800'} 
+                />
+                <Text style={[styles.buttonText, styles.premiumButtonText]}>
+                  {isPremium ? 'Créno Premium actif' : 'Passer à Premium'}
+                </Text>
+              </>
+            )}
           </View>
         </TouchableOpacity>
         
@@ -190,9 +221,34 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         visible={showPremiumModal}
         onClose={() => setShowPremiumModal(false)}
         isPremium={isPremium}
-        onUpgrade={() => {
-          checkPremiumStatus();
+        onUpgrade={async () => {
           setShowPremiumModal(false);
+          // Attendre un peu pour que StoreKit se mette à jour
+          setTimeout(async () => {
+            await checkPremiumStatus();
+          }, 1000);
+          
+          // Rafraîchir plus fréquemment après un achat (toutes les 10 secondes pendant 1 minute)
+          if (refreshInterval) {
+            clearInterval(refreshInterval);
+          }
+          
+          const fastInterval = setInterval(() => {
+            checkPremiumStatus();
+          }, 10000); // 10 secondes
+          
+          setRefreshInterval(fastInterval);
+          
+          // Revenir à l'intervalle normal après 1 minute
+          setTimeout(() => {
+            if (fastInterval) {
+              clearInterval(fastInterval);
+            }
+            const normalInterval = setInterval(() => {
+              checkPremiumStatus();
+            }, 30000);
+            setRefreshInterval(normalInterval);
+          }, 60000);
         }}
       />
     </View>
@@ -246,6 +302,11 @@ const styles = StyleSheet.create({
   disabledButton: {
   },
   privacyButton: {
+  },
+  debugButton: {
+    backgroundColor: 'rgba(255, 165, 0, 0.1)',
+    borderWidth: 1,
+    borderColor: '#FFA500',
   },
   logoutButton: {
     marginBottom: 15,

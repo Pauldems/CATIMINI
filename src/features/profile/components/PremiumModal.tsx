@@ -22,22 +22,43 @@ interface PremiumModalProps {
 export const PremiumModal: React.FC<PremiumModalProps> = ({
   visible,
   onClose,
-  isPremium,
+  isPremium: isPremiumProp,
   onUpgrade
 }) => {
   const [loading, setLoading] = useState(false);
-  const [price, setPrice] = useState('2,00 €');
+  const [price, setPrice] = useState('0,99 €');
+  const [isPremium, setIsPremium] = useState(isPremiumProp);
 
   useEffect(() => {
-    // Charger le prix depuis RevenueCat
-    const loadPrice = async () => {
-      const priceString = await premiumService.getSubscriptionPrice();
-      setPrice(priceString);
-    };
-    loadPrice();
-  }, []);
+    // Vérifier le statut premium et charger le prix à chaque ouverture
+    if (visible) {
+      const checkStatus = async () => {
+        const status = await premiumService.checkPremiumStatus();
+        setIsPremium(status);
+      };
+      checkStatus();
+      
+      // Recharger le prix à chaque ouverture
+      const loadPrice = async () => {
+        const priceString = await premiumService.getSubscriptionPrice();
+        setPrice(priceString);
+      };
+      loadPrice();
+    }
+  }, [visible]);
 
   const handleUpgrade = async () => {
+    // Vérifier d'abord si on est déjà premium
+    const currentStatus = await premiumService.checkPremiumStatus();
+    if (currentStatus) {
+      Alert.alert(
+        'Vous êtes déjà Premium !',
+        'Votre abonnement Premium est actif.',
+        [{ text: 'OK', onPress: onClose }]
+      );
+      return;
+    }
+    
     setLoading(true);
     try {
       const success = await premiumService.activatePremium();
@@ -51,12 +72,47 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({
           }}]
         );
       }
-    } catch (error) {
-      Alert.alert(
-        'Erreur',
-        'Une erreur est survenue lors de l\'achat. Veuillez réessayer.',
-        [{ text: 'OK' }]
-      );
+    } catch (error: any) {
+      console.error('Erreur dans handleUpgrade:', error);
+      
+      // Vérifier si c'est une erreur "déjà abonné"
+      if (error.message && error.message.includes('already')) {
+        Alert.alert(
+          'Déjà abonné',
+          'Vous êtes déjà abonné à Premium.',
+          [{ text: 'OK', onPress: () => {
+            onUpgrade();
+            onClose();
+          }}]
+        );
+      } else if (error.message === 'Achat annulé') {
+        // L'utilisateur a annulé, pas besoin d'afficher une alerte
+        console.log('Achat annulé par l\'utilisateur');
+      } else if (error.message?.includes('App Store')) {
+        Alert.alert(
+          'Problème de connexion',
+          error.message,
+          [
+            { text: 'Annuler', style: 'cancel' },
+            { text: 'Réessayer', onPress: () => setTimeout(handleUpgrade, 1000) }
+          ]
+        );
+      } else if (error.message?.includes('Timeout')) {
+        Alert.alert(
+          'Délai dépassé',
+          'La connexion à l\'App Store prend trop de temps. Vérifiez votre connexion internet et réessayez.',
+          [
+            { text: 'Annuler', style: 'cancel' },
+            { text: 'Réessayer', onPress: () => setTimeout(handleUpgrade, 1000) }
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Erreur',
+          error.message || 'Une erreur est survenue lors de l\'achat. Veuillez réessayer.',
+          [{ text: 'OK' }]
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -128,7 +184,7 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({
               </TouchableOpacity>
               
               <View style={styles.starContainer}>
-                <Ionicons name="star" size={48} color="#FFD700" />
+                <Ionicons name="star" size={30} color="#FFD700" />
               </View>
               
               <Text style={styles.title}>
@@ -141,7 +197,7 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({
                     ✨ Vous êtes Premium !
                   </Text>
                   <Text style={styles.premiumStatusSubtext}>
-                    {premiumService.getRemainingDays()} jours restants
+                    {premiumService.getRemainingTime()} restant{premiumService.getRemainingTime().includes('minute') ? 's' : ''}
                   </Text>
                 </View>
               ) : (
@@ -168,6 +224,33 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({
                   </View>
                 </View>
               ))}
+            </View>
+
+            {/* Comparison - Moved before pricing */}
+            <View style={styles.comparisonContainer}>
+              <Text style={styles.comparisonTitle}>Comparaison des plans</Text>
+              
+              <View style={styles.comparisonTable}>
+                <View style={[styles.comparisonRow, styles.comparisonHeader]}>
+                  <Text style={styles.comparisonFeature}></Text>
+                  <Text style={styles.comparisonHeaderText}>Gratuit</Text>
+                  <Text style={[styles.comparisonHeaderText, styles.comparisonHeaderPremium]}>Premium</Text>
+                </View>
+                
+                <View style={styles.comparisonRow}>
+                  <Text style={styles.comparisonFeature}>Indisponibilités</Text>
+                  <Text style={styles.comparisonFree}>10 max</Text>
+                  <Text style={styles.comparisonPremium}>Illimitées ✨</Text>
+                </View>
+                
+                <View style={styles.comparisonRow}>
+                  <Text style={styles.comparisonFeature}>Groupes</Text>
+                  <Text style={styles.comparisonFree}>1 max</Text>
+                  <Text style={styles.comparisonPremium}>Illimités ✨</Text>
+                </View>
+                
+                
+              </View>
             </View>
 
             {!isPremium && (
@@ -213,32 +296,6 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({
                 </TouchableOpacity>
               </>
             )}
-
-            {/* Comparison */}
-            <View style={styles.comparisonContainer}>
-              <Text style={styles.comparisonTitle}>Comparaison des plans</Text>
-              
-              <View style={styles.comparisonTable}>
-                <View style={styles.comparisonRow}>
-                  <Text style={styles.comparisonFeature}>Indisponibilités</Text>
-                  <Text style={styles.comparisonFree}>10 max</Text>
-                  <Text style={styles.comparisonPremium}>Illimitées ✨</Text>
-                </View>
-                
-                <View style={styles.comparisonRow}>
-                  <Text style={styles.comparisonFeature}>Groupes</Text>
-                  <Text style={styles.comparisonFree}>1 max</Text>
-                  <Text style={styles.comparisonPremium}>Illimités ✨</Text>
-                </View>
-                
-                
-                <View style={styles.comparisonRow}>
-                  <Text style={styles.comparisonFeature}>Support prioritaire</Text>
-                  <Text style={styles.comparisonFree}>Standard</Text>
-                  <Text style={styles.comparisonPremium}>Prioritaire ✨</Text>
-                </View>
-              </View>
-            </View>
           </ScrollView>
         </View>
       </View>
@@ -256,11 +313,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '90%',
-    paddingBottom: 34, // Safe area
+    maxHeight: '85%',
+    paddingBottom: 20,
   },
   header: {
-    padding: 24,
+    padding: 12,
+    paddingTop: 16,
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
@@ -272,20 +330,20 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   starContainer: {
-    width: 80,
-    height: 80,
+    width: 50,
+    height: 50,
     backgroundColor: '#FFF8E1',
-    borderRadius: 40,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '800',
     color: '#1A3B5C',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   subtitle: {
     fontSize: 16,
@@ -307,51 +365,53 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   featuresContainer: {
-    padding: 24,
+    padding: 16,
+    paddingTop: 8,
+    paddingBottom: 4,
   },
   featureRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 10,
   },
   featureIcon: {
-    width: 48,
-    height: 48,
+    width: 40,
+    height: 40,
     backgroundColor: '#F8F9FA',
-    borderRadius: 24,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 12,
   },
   featureText: {
     flex: 1,
   },
   featureTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: '#1A3B5C',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   featureDescription: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#666',
-    lineHeight: 20,
+    lineHeight: 18,
   },
   pricingContainer: {
     alignItems: 'center',
-    marginBottom: 24,
-    paddingHorizontal: 24,
+    marginBottom: 16,
+    paddingHorizontal: 16,
   },
   priceCard: {
     backgroundColor: '#1A3B5C',
-    paddingHorizontal: 32,
-    paddingVertical: 16,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
     borderRadius: 16,
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   priceAmount: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '800',
     color: 'white',
   },
@@ -367,13 +427,13 @@ const styles = StyleSheet.create({
   },
   upgradeButton: {
     backgroundColor: '#FFB800',
-    marginHorizontal: 24,
-    paddingVertical: 16,
+    marginHorizontal: 16,
+    paddingVertical: 12,
     borderRadius: 16,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 12,
     shadowColor: '#FFB800',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -390,9 +450,9 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   restoreButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    marginBottom: 24,
+    paddingVertical: 4,
+    paddingHorizontal: 16,
+    marginBottom: 8,
   },
   restoreButtonText: {
     color: '#FFB800',
@@ -402,39 +462,42 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   comparisonContainer: {
-    paddingHorizontal: 24,
-    paddingBottom: 24,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    paddingTop: 0,
   },
   comparisonTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#1A3B5C',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 8,
   },
   comparisonTable: {
     backgroundColor: '#F8F9FA',
     borderRadius: 12,
-    padding: 16,
+    padding: 12,
   },
   comparisonRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 6,
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
   },
   comparisonFeature: {
-    flex: 2,
+    flex: 1.5,
     fontSize: 14,
     fontWeight: '600',
     color: '#1A3B5C',
+    paddingRight: 8,
   },
   comparisonFree: {
     flex: 1,
     fontSize: 12,
     color: '#999',
     textAlign: 'center',
+    paddingHorizontal: 4,
   },
   comparisonPremium: {
     flex: 1,
@@ -442,5 +505,21 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     fontWeight: '600',
     textAlign: 'center',
+    paddingHorizontal: 4,
+  },
+  comparisonHeader: {
+    backgroundColor: '#F0F0F0',
+    paddingVertical: 6,
+    marginBottom: 2,
+  },
+  comparisonHeaderText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#666',
+    textAlign: 'center',
+  },
+  comparisonHeaderPremium: {
+    color: '#FFB800',
   },
 });

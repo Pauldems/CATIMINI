@@ -146,8 +146,7 @@ export default function FriendsScreen({ navigation }: any) {
 
     const unsubscribe = onSnapshot(availQuery, (snapshot) => {
       const allAvails: { [userId: string]: Availability[] } = {};
-      const marked: any = {};
-
+      
       snapshot.forEach((doc) => {
         const data = doc.data() as Availability;
         
@@ -155,34 +154,74 @@ export default function FriendsScreen({ navigation }: any) {
           allAvails[data.userId] = [];
         }
         allAvails[data.userId].push({ ...data, id: doc.id });
-
-        // Marquer seulement les indisponibilités avec couleurs du logo
-        if (!data.isAvailable) {
-          const date = data.date;
-          if (!marked[date]) {
-            marked[date] = {
-              marked: true,
-              dotColor: '#1A3B5C',
-              customStyles: {
-                container: {
-                  backgroundColor: '#1A3B5C',
-                  borderRadius: 25,
-                  width: 35,
-                  height: 35,
-                },
-                text: {
-                  color: '#FFFFFF',
-                  fontWeight: '600',
-                  fontSize: 14
-                }
-              }
-            };
-          }
-        }
       });
 
       setAvailabilities(allAvails);
-      setMarkedDates(marked);
+      
+      // Reconstruire les marqueurs en préservant les événements existants
+      setMarkedDates(prevMarked => {
+        const marked: any = {};
+        
+        // D'abord, conserver tous les marqueurs d'événements existants
+        Object.keys(prevMarked).forEach(date => {
+          if (prevMarked[date] && 
+              (prevMarked[date].dotColor === '#FFB800' || 
+               prevMarked[date].customStyles?.container?.borderColor === '#FFB800')) {
+            marked[date] = prevMarked[date];
+          }
+        });
+        
+        // Ensuite, ajouter ou mettre à jour avec les indisponibilités
+        snapshot.forEach((doc) => {
+          const data = doc.data() as Availability;
+          
+          if (!data.isAvailable) {
+            const date = data.date;
+            if (!marked[date]) {
+              // Pas de marqueur existant, créer un marqueur d'indisponibilité
+              marked[date] = {
+                marked: true,
+                dotColor: '#1A3B5C',
+                customStyles: {
+                  container: {
+                    backgroundColor: '#1A3B5C',
+                    borderRadius: 25,
+                    width: 35,
+                    height: 35,
+                  },
+                  text: {
+                    color: '#FFFFFF',
+                    fontWeight: '600',
+                    fontSize: 14
+                  }
+                }
+              };
+            } else if (marked[date].dotColor === '#FFB800') {
+              // Il y a déjà un événement, ajouter l'indisponibilité avec bordure jaune
+              marked[date] = {
+                ...marked[date],
+                customStyles: {
+                  container: {
+                    backgroundColor: '#1A3B5C',
+                    borderRadius: 25,
+                    width: 35,
+                    height: 35,
+                    borderWidth: 2,
+                    borderColor: '#FFB800',
+                  },
+                  text: {
+                    color: '#FFFFFF',
+                    fontWeight: '600',
+                    fontSize: 14
+                  }
+                }
+              };
+            }
+          }
+        });
+        
+        return marked;
+      });
     });
 
     return unsubscribe;
@@ -214,10 +253,14 @@ export default function FriendsScreen({ navigation }: any) {
   };
 
   const updateMarkedDatesWithEvents = (eventsData: Event[]) => {
+    console.log('🎯 updateMarkedDatesWithEvents appelé avec', eventsData.length, 'événements');
+    
     setMarkedDates(prevMarked => {
       const newMarked = { ...prevMarked };
       
-      // D'abord, nettoyer les anciens marqueurs d'événements
+      console.log('📅 État initial des markedDates:', Object.keys(prevMarked).length, 'dates marquées');
+      
+      // D'abord, nettoyer les anciens marqueurs d'événements uniquement
       Object.keys(newMarked).forEach(date => {
         if (!newMarked[date]) return;
         
@@ -229,32 +272,41 @@ export default function FriendsScreen({ navigation }: any) {
           return checkDate >= startDate && checkDate <= endDate;
         });
         
-        // Si cette date n'a plus d'événement et était avec bordure jaune seulement
-        if (!hasEvent && newMarked[date] && 
-            newMarked[date].customStyles?.container?.backgroundColor === 'transparent' && 
-            newMarked[date].customStyles?.container?.borderColor === Colors.secondary) {
-          delete newMarked[date];
-        }
-        
-        // Si cette date était indisponible avec bordure d'événement, enlever la bordure
-        if (!hasEvent && newMarked[date] && newMarked[date].customStyles?.container?.borderColor === '#FFB800') {
-          newMarked[date].customStyles = {
-            container: {
-              backgroundColor: '#1A3B5C',
-              borderRadius: 25,
-              width: 35,
-              height: 35,
-            },
-            text: {
-              color: '#FFFFFF',
-              fontWeight: '600'
-            }
-          };
+        // Si cette date n'a plus d'événement
+        if (!hasEvent) {
+          // Si c'était un marqueur d'événement seul (sans indispo), le supprimer
+          if (newMarked[date].dotColor === '#FFB800' && !newMarked[date].customStyles?.container?.backgroundColor) {
+            console.log('🗑️ Suppression marqueur événement seul pour', date);
+            delete newMarked[date];
+          }
+          // Si c'était une indispo avec bordure d'événement, enlever la bordure
+          else if (newMarked[date].customStyles?.container?.borderColor === '#FFB800') {
+            console.log('🔄 Suppression bordure événement pour indispo', date);
+            newMarked[date] = {
+              marked: true,
+              dotColor: '#1A3B5C',
+              customStyles: {
+                container: {
+                  backgroundColor: '#1A3B5C',
+                  borderRadius: 25,
+                  width: 35,
+                  height: 35,
+                },
+                text: {
+                  color: '#FFFFFF',
+                  fontWeight: '600',
+                  fontSize: 14
+                }
+              }
+            };
+          }
         }
       });
       
       // Ajouter les marqueurs d'événements (cercles jaunes) pour TOUS les événements du groupe
       eventsData.forEach(event => {
+        console.log(`📍 Traitement événement "${event.title}" du ${event.startDate} au ${event.endDate}`);
+        
         const startDate = new Date(event.startDate);
         const endDate = new Date(event.endDate);
         
@@ -264,28 +316,56 @@ export default function FriendsScreen({ navigation }: any) {
           
           if (!newMarked[dateStr]) {
             // Date vide - ajouter cercle jaune avec point jaune
+            console.log('✅ Ajout cercle jaune pour date vide:', dateStr);
             newMarked[dateStr] = {
               marked: true,
               dotColor: '#FFB800',
+              customStyles: {
+                container: {
+                  backgroundColor: 'transparent',
+                  borderRadius: 25,
+                  width: 35,
+                  height: 35,
+                  borderWidth: 2,
+                  borderColor: '#FFB800',
+                },
+                text: {
+                  color: '#1A3B5C',
+                  fontWeight: '600',
+                  fontSize: 14
+                }
+              }
             };
-          } else {
+          } else if (newMarked[dateStr].customStyles?.container?.backgroundColor === '#1A3B5C') {
             // Date avec indisponibilité - ajouter bordure jaune en plus et garder le point jaune
+            console.log('🔵🟡 Ajout bordure jaune sur indispo existante:', dateStr);
             newMarked[dateStr] = {
               ...newMarked[dateStr],
               marked: true,
               dotColor: '#FFB800',
               customStyles: {
-                ...newMarked[dateStr].customStyles,
                 container: {
-                  ...newMarked[dateStr].customStyles?.container,
+                  backgroundColor: '#1A3B5C',
+                  borderRadius: 25,
+                  width: 35,
+                  height: 35,
                   borderWidth: 2,
                   borderColor: '#FFB800',
+                },
+                text: {
+                  color: '#FFFFFF',
+                  fontWeight: '600',
+                  fontSize: 14
                 }
               }
             };
+          } else {
+            console.log('⚠️ Date déjà marquée, état actuel:', dateStr, newMarked[dateStr]);
           }
         }
       });
+      
+      console.log('📊 État final des markedDates:', Object.keys(newMarked).length, 'dates marquées');
       
       return newMarked;
     });

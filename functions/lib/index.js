@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onNotificationCreated = exports.testNotification = exports.sendVerificationEmail = void 0;
+exports.manualCleanup = exports.scheduledCleanup = exports.onNotificationCreated = exports.testNotification = exports.sendVerificationEmail = void 0;
 const app_1 = require("firebase-admin/app");
 // Initialiser Firebase Admin
 (0, app_1.initializeApp)();
@@ -10,4 +10,7 @@ Object.defineProperty(exports, "sendVerificationEmail", { enumerable: true, get:
 var notificationService_1 = require("./notificationService");
 Object.defineProperty(exports, "testNotification", { enumerable: true, get: function () { return notificationService_1.testNotification; } });
 Object.defineProperty(exports, "onNotificationCreated", { enumerable: true, get: function () { return notificationService_1.onNotificationCreated; } });
+var cleanupService_1 = require("./cleanupService");
+Object.defineProperty(exports, "scheduledCleanup", { enumerable: true, get: function () { return cleanupService_1.scheduledCleanup; } });
+Object.defineProperty(exports, "manualCleanup", { enumerable: true, get: function () { return cleanupService_1.manualCleanup; } });
 //# sourceMappingURL=index.js.map

@@ -43,6 +43,7 @@ import { FriendsScreen, SettingsScreen } from './src/features/profile/screens';
 import notificationService from './src/services/notificationService';
 import premiumService from './src/services/premiumService';
 import storeKitService from './src/services/storeKitService';
+import cleanupService from './src/services/cleanupService';
 
 // Components
 import { CustomTabBar } from './src/components';
@@ -264,6 +265,10 @@ export default function App() {
         // Lancer les initialisations
         Promise.all([initStoreKit(), initPremium()]).then(() => {
           console.log('🔑 [App] Tous les services sont initialisés');
+          
+          // Démarrer le nettoyage automatique des indispos passées
+          cleanupService.startAutoCleanup();
+          console.log('🧹 [App] Service de nettoyage démarré');
         });
         
         // Initialiser les notifications de manière sécurisée
@@ -328,6 +333,8 @@ export default function App() {
     return () => {
       clearTimeout(timeoutId);
       unsubscribe();
+      // Nettoyer le service premium
+      premiumService.cleanup();
     };
   }, []);
 

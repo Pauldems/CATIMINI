@@ -32,13 +32,18 @@ import notificationService from '../../../services/notificationService';
 import { useCurrentGroup } from '../../../hooks/useCurrentGroup';
 import GroupRequiredScreen from './GroupRequiredScreen';
 import { Colors } from '../../../theme/colors';
+import { PremiumModal } from '../../profile/components/PremiumModal';
 
 export default function AvailabilityScreen({ navigation }: any) {
   const { currentGroup, loading: groupLoading, needsGroupSelection } = useCurrentGroup();
   const scrollViewRef = useRef<ScrollView>(null);
   const [selectedStartDate, setSelectedStartDate] = useState(() => {
-    // Sélectionner aujourd'hui par défaut
-    return new Date().toISOString().split('T')[0];
+    // Sélectionner aujourd'hui par défaut basé sur l'heure locale
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   });
   const [selectedEndDate, setSelectedEndDate] = useState('');
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
@@ -62,6 +67,8 @@ export default function AvailabilityScreen({ navigation }: any) {
   const [markedDates, setMarkedDates] = useState<any>({});
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showTooltip, setShowTooltip] = useState(false);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [isPremium, setIsPremium] = useState(false);
 
   // Listener pour remettre la page en haut quand on arrive sur l'écran
   useEffect(() => {
@@ -69,16 +76,27 @@ export default function AvailabilityScreen({ navigation }: any) {
       scrollViewRef.current?.scrollTo({ y: 0, animated: false });
       // Rafraîchir les données quand on revient sur l'onglet
       setRefreshTrigger(prev => prev + 1);
-      // Remettre la date d'aujourd'hui par défaut
-      const today = new Date().toISOString().split('T')[0];
+      // Remettre la date d'aujourd'hui par défaut basée sur l'heure locale
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const today = `${year}-${month}-${day}`;
       setSelectedStartDate(today);
       setSelectedEndDate('');
       setIsMultiDay(false);
       // Fermer le tooltip
       setShowTooltip(false);
+      // Vérifier le statut premium
+      checkPremiumStatus();
     });
     return unsubscribe;
   }, [navigation]);
+
+  const checkPremiumStatus = async () => {
+    const premium = await premiumService.checkPremiumStatus();
+    setIsPremium(premium);
+  };
 
   useEffect(() => {
     if (!auth.currentUser || !currentGroup) return;
@@ -367,10 +385,31 @@ export default function AvailabilityScreen({ navigation }: any) {
     }
   };
 
+  const getUnavailabilities = async (userId: string): Promise<any[]> => {
+    const q = query(
+      collection(db, 'availabilities'),
+      where('userId', '==', userId),
+      where('isAvailable', '==', false)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  };
+
   const addUnavailabilityDates = async (dates: string[], createdByEvent?: string) => {
     if (!auth.currentUser) return;
 
     try {
+      // Vérifier les limites Premium
+      if (!isPremium) {
+        const currentUnavailabilities = await getUnavailabilities(auth.currentUser.uid);
+        const totalDays = currentUnavailabilities.length + dates.length;
+        
+        if (totalDays > 10) {
+          setShowPremiumModal(true);
+          return;
+        }
+      }
+
       // D'abord, retirer l'utilisateur des événements en conflit (seulement pour les indisponibilités manuelles)
       const conflictingEvents = createdByEvent ? [] : await removeUserFromConflictingEvents(dates, startTime, endTime);
       
@@ -804,7 +843,8 @@ export default function AvailabilityScreen({ navigation }: any) {
 
 
   return (
-    <ScrollView ref={scrollViewRef} style={styles.container} contentContainerStyle={styles.scrollContent}>
+    <>
+      <ScrollView ref={scrollViewRef} style={styles.container} contentContainerStyle={styles.scrollContent}>
       <View style={styles.titleContainer}>
         <Text style={styles.title}>Mon Agenda</Text>
       </View>
@@ -1197,6 +1237,21 @@ export default function AvailabilityScreen({ navigation }: any) {
         </View>
       </Modal>
     </ScrollView>
+
+    {/* Modal Premium */}
+    <PremiumModal
+      visible={showPremiumModal}
+      onClose={() => setShowPremiumModal(false)}
+      isPremium={isPremium}
+      onUpgrade={async () => {
+        setShowPremiumModal(false);
+        // Attendre un peu pour que StoreKit se mette à jour
+        setTimeout(async () => {
+          await checkPremiumStatus();
+        }, 1000);
+      }}
+    />
+    </>
   );
 }
 

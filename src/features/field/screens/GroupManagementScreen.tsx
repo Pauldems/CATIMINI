@@ -12,7 +12,9 @@ import {
 import { auth } from '../../../config/firebase';
 import { Group } from '../../../types';
 import groupService from '../../../services/groupService';
+import premiumService from '../../../services/premiumService';
 import { Colors } from '../../../theme/colors';
+import { PremiumModal } from '../../profile/components/PremiumModal';
 
 export default function GroupManagementScreen({ navigation }: any) {
   const [groups, setGroups] = useState<Group[]>([]);
@@ -23,10 +25,18 @@ export default function GroupManagementScreen({ navigation }: any) {
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupDescription, setNewGroupDescription] = useState('');
   const [inviteCode, setInviteCode] = useState('');
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [isPremium, setIsPremium] = useState(false);
 
   useEffect(() => {
     loadUserGroups();
+    checkPremiumStatus();
   }, []);
+
+  const checkPremiumStatus = async () => {
+    const premium = await premiumService.checkPremiumStatus();
+    setIsPremium(premium);
+  };
 
   const loadUserGroups = async () => {
     if (!auth.currentUser) return;
@@ -60,6 +70,15 @@ export default function GroupManagementScreen({ navigation }: any) {
     }
 
     try {
+      // Vérifier si l'utilisateur peut créer un groupe
+      const isPremium = await premiumService.checkPremiumStatus();
+      const userGroups = await groupService.getUserGroups(auth.currentUser!.uid);
+      
+      if (!isPremium && userGroups.length >= 1) {
+        setShowPremiumModal(true);
+        return;
+      }
+
       const groupId = await groupService.createGroup(
         newGroupName.trim(),
         newGroupDescription.trim(),
@@ -147,7 +166,8 @@ export default function GroupManagementScreen({ navigation }: any) {
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <>
+      <ScrollView style={styles.container}>
       <Text style={styles.title}>Mes Groupes</Text>
 
       <View style={styles.buttonContainer}>
@@ -281,6 +301,21 @@ export default function GroupManagementScreen({ navigation }: any) {
         </View>
       </Modal>
     </ScrollView>
+
+    {/* Modal Premium */}
+    <PremiumModal
+      visible={showPremiumModal}
+      onClose={() => setShowPremiumModal(false)}
+      isPremium={isPremium}
+      onUpgrade={async () => {
+        setShowPremiumModal(false);
+        // Attendre un peu pour que StoreKit se mette à jour
+        setTimeout(async () => {
+          await checkPremiumStatus();
+        }, 1000);
+      }}
+    />
+    </>
   );
 }
 

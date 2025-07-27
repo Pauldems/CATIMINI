@@ -7,7 +7,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleDisplayName</key>
-    <string>Créno</string>
+    <string>functions</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -19,7 +19,7 @@
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.2</string>
+    <string>1.0.0</string>
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleURLTypes</key>
@@ -27,20 +27,18 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>com.catimini.app</string>
+          <string>com.paulopaul1.functions</string>
         </array>
       </dict>
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>exp+catimini-app</string>
+          <string>exp+functions</string>
         </array>
       </dict>
     </array>
     <key>CFBundleVersion</key>
-    <string>50</string>
-    <key>ITSAppUsesNonExemptEncryption</key>
-    <false/>
+    <string>1</string>
     <key>LSMinimumSystemVersion</key>
     <string>12.0</string>
     <key>LSRequiresIPhoneOS</key>
@@ -52,23 +50,6 @@
       <key>NSAllowsLocalNetworking</key>
       <true/>
     </dict>
-    <key>NSPrivacyAccessedAPITypes</key>
-    <array>
-      <dict>
-        <key>NSPrivacyAccessedAPIType</key>
-        <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
-        <key>NSPrivacyAccessedAPITypeReasons</key>
-        <array>
-          <string>CA92.1</string>
-        </array>
-      </dict>
-    </array>
-    <key>NSUserNotificationsUsageDescription</key>
-    <string>Créno utilise les notifications pour vous informer des nouveaux événements, invitations de groupe et rappels d'événements auxquels vous participez.</string>
-    <key>UIBackgroundModes</key>
-    <array>
-      <string>remote-notification</string>
-    </array>
     <key>UILaunchStoryboardName</key>
     <string>SplashScreen</string>
     <key>UIRequiredDeviceCapabilities</key>
@@ -80,11 +61,6 @@
     <key>UIStatusBarStyle</key>
     <string>UIStatusBarStyleDefault</string>
     <key>UISupportedInterfaceOrientations</key>
-    <array>
-      <string>UIInterfaceOrientationPortrait</string>
-      <string>UIInterfaceOrientationPortraitUpsideDown</string>
-    </array>
-    <key>UISupportedInterfaceOrientations~ipad</key>
     <array>
       <string>UIInterfaceOrientationPortrait</string>
       <string>UIInterfaceOrientationPortraitUpsideDown</string>
