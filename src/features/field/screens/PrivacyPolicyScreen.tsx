@@ -92,7 +92,7 @@ export default function PrivacyPolicyScreen({ navigation }: PrivacyPolicyScreenP
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>7. Contact</Text>
           <Text style={styles.text}>Pour toute question concernant cette politique de confidentialité ou vos données personnelles :</Text>
-          <Text style={styles.bulletPoint}>• Email : cati.appcontact@gmail.com</Text>
+          <Text style={styles.bulletPoint}>• Site web : topal.fr (rubrique "Contactez-nous")</Text>
           <Text style={styles.bulletPoint}>• Via les paramètres de l'application</Text>
         </View>
 

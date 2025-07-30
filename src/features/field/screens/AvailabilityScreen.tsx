@@ -101,18 +101,42 @@ export default function AvailabilityScreen({ navigation }: any) {
   useEffect(() => {
     if (!auth.currentUser || !currentGroup) return;
 
-    const q = query(
-      collection(db, 'availabilities'),
-      where('userId', '==', auth.currentUser.uid)
-    );
+    const loadAvailabilities = async () => {
+      try {
+        const q = query(
+          collection(db, 'availabilities'),
+          where('userId', '==', auth.currentUser.uid)
+        );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+        // Essayer d'abord avec getDocs pour charger les données initiales
+        const initialSnapshot = await getDocs(q);
+        processAvailabilities(initialSnapshot);
+
+        // Puis établir le listener pour les mises à jour
+        const unsubscribe = onSnapshot(q, 
+          (snapshot) => {
+            processAvailabilities(snapshot);
+          },
+          (error) => {
+            console.error('❌ Erreur listener availabilities:', error);
+            // En cas d'erreur, réessayer avec getDocs
+            getDocs(q).then(processAvailabilities).catch(console.error);
+          }
+        );
+
+        return unsubscribe;
+      } catch (error) {
+        console.error('❌ Erreur chargement initial availabilities:', error);
+      }
+    };
+
+    const processAvailabilities = (snapshot: any) => {
       const avails: { [key: string]: Availability[] } = {};
       const marked: any = {};
 
-      console.log(`📅 Récupération des indispos pour ${auth.currentUser.uid}, total: ${snapshot.size}`);
+      console.log(`📅 Récupération des indispos pour ${auth.currentUser?.uid}, total: ${snapshot.size}`);
 
-      snapshot.forEach((doc) => {
+      snapshot.forEach((doc: any) => {
         const data = doc.data() as Availability;
         const date = data.date;
         
@@ -147,24 +171,49 @@ export default function AvailabilityScreen({ navigation }: any) {
       setAvailabilities(avails);
       console.log('📍 Dates marquées en rouge:', Object.keys(marked));
       setMarkedDates(marked);
-    });
+    };
+
+    let unsubscribeAvailabilities: (() => void) | undefined;
 
     // Charger seulement les événements du groupe actuel
-    const eventsQuery = query(
-      collection(db, 'events'),
-      where('groupId', '==', currentGroup.id)
-    );
+    const loadEvents = async () => {
+      try {
+        const eventsQuery = query(
+          collection(db, 'events'),
+          where('groupId', '==', currentGroup.id)
+        );
 
-    const unsubscribeEvents = onSnapshot(eventsQuery, (snapshot) => {
+        // Charger d'abord avec getDocs
+        const initialSnapshot = await getDocs(eventsQuery);
+        processEvents(initialSnapshot);
+
+        // Puis établir le listener
+        const unsubscribeEvents = onSnapshot(eventsQuery, 
+          (snapshot) => {
+            processEvents(snapshot);
+          },
+          (error) => {
+            console.error('❌ Erreur listener events:', error);
+            getDocs(eventsQuery).then(processEvents).catch(console.error);
+          }
+        );
+
+        return unsubscribeEvents;
+      } catch (error) {
+        console.error('❌ Erreur chargement initial events:', error);
+      }
+    };
+
+    const processEvents = (snapshot: any) => {
       const eventsData: Event[] = []; // Pour l'affichage (seulement mes événements)
-      const allEvents: Event[] = []; // Pour les conflits (tous les événements)
+      const allEventsData: Event[] = []; // Pour les conflits (tous les événements)
       const eventMarked: any = {};
       
-      snapshot.forEach((doc) => {
+      snapshot.forEach((doc: any) => {
         const eventData = { ...doc.data(), id: doc.id } as Event;
         
         // Ajouter à la liste complète pour les conflits
-        allEvents.push(eventData);
+        allEventsData.push(eventData);
         
         // Dans l'agenda, traiter seulement les événements où l'utilisateur participe
         if (eventData.participants.includes(auth.currentUser!.uid)) {
@@ -207,7 +256,7 @@ export default function AvailabilityScreen({ navigation }: any) {
       
       setEvents(eventsData);
       // Stocker tous les événements pour la détection de conflits
-      setAllEvents(allEvents);
+      setAllEvents(allEventsData);
       
       // Combiner intelligemment les marqueurs d'événements avec les indispos
       setMarkedDates(prevMarked => {
@@ -250,11 +299,19 @@ export default function AvailabilityScreen({ navigation }: any) {
         
         return combinedMarkers;
       });
-    });
+    };
+
+    let unsubscribeEvents: (() => void) | undefined;
+
+    // Charger les données
+    Promise.all([
+      loadAvailabilities().then(unsub => { unsubscribeAvailabilities = unsub; }),
+      loadEvents().then(unsub => { unsubscribeEvents = unsub; })
+    ]);
 
     return () => {
-      unsubscribe();
-      unsubscribeEvents();
+      unsubscribeAvailabilities?.();
+      unsubscribeEvents?.();
     };
   }, [currentGroup, refreshTrigger]);
 

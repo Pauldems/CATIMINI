@@ -176,9 +176,16 @@ export default function RegisterScreen({ navigation }: any) {
               <Text style={styles.termsLabel}>J'accepte les </Text>
               <Text 
                 style={styles.termsLink}
+                onPress={() => navigation.navigate('TermsOfUse')}
+              >
+                conditions d'utilisation
+              </Text>
+              <Text style={styles.termsLabel}> et la </Text>
+              <Text 
+                style={styles.termsLink}
                 onPress={() => navigation.navigate('PrivacyPolicy')}
               >
-                conditions d'utilisation et la politique de confidentialité
+                politique de confidentialité
               </Text>
             </Text>
           </View>

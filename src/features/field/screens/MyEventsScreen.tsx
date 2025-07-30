@@ -41,6 +41,8 @@ const MyEventsScreen: React.FC<MyEventsScreenProps> = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [availabilities, setAvailabilities] = useState<Availability[]>([]);
   const [friends, setFriends] = useState<(Friend & { friendData?: User })[]>([]);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [cachedUsers, setCachedUsers] = useState<Map<string, User>>(new Map());
 
   // Listener pour remettre la page en haut quand on arrive sur l'écran
   useEffect(() => {
@@ -49,6 +51,25 @@ const MyEventsScreen: React.FC<MyEventsScreenProps> = ({ navigation }) => {
     });
     return unsubscribe;
   }, [navigation]);
+
+  // Cache des utilisateurs pour éviter les requêtes répétées
+  const getUserFromCache = async (userId: string): Promise<User | null> => {
+    if (cachedUsers.has(userId)) {
+      return cachedUsers.get(userId)!;
+    }
+    
+    try {
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      if (userDoc.exists()) {
+        const userData = { ...userDoc.data(), id: userDoc.id } as User;
+        setCachedUsers(prev => new Map(prev).set(userId, userData));
+        return userData;
+      }
+    } catch (error) {
+      console.error('Erreur chargement utilisateur:', userId, error);
+    }
+    return null;
+  };
 
   // Fonction pour vérifier si un événement est en conflit avec les indisponibilités
   const hasEventConflict = (event: Event, userAvailabilities: Availability[]): boolean => {
@@ -97,20 +118,45 @@ const MyEventsScreen: React.FC<MyEventsScreenProps> = ({ navigation }) => {
     const user = auth.currentUser;
     if (!user) return;
 
-    const availQuery = query(
-      collection(db, 'availabilities'),
-      where('userId', '==', user.uid)
-    );
+    const loadAvailabilities = async () => {
+      try {
+        const availQuery = query(
+          collection(db, 'availabilities'),
+          where('userId', '==', user.uid)
+        );
 
-    const unsubscribe = onSnapshot(availQuery, (snapshot) => {
-      const availData: Availability[] = [];
-      snapshot.forEach((doc) => {
-        availData.push({ id: doc.id, ...doc.data() } as Availability);
-      });
-      setAvailabilities(availData);
-    });
+        // Charger d'abord avec getDocs
+        const initialSnapshot = await getDocs(availQuery);
+        const availData: Availability[] = [];
+        initialSnapshot.forEach((doc) => {
+          availData.push({ id: doc.id, ...doc.data() } as Availability);
+        });
+        setAvailabilities(availData);
 
-    return unsubscribe;
+        // Puis établir le listener
+        const unsubscribe = onSnapshot(availQuery, 
+          (snapshot) => {
+            const availData: Availability[] = [];
+            snapshot.forEach((doc) => {
+              availData.push({ id: doc.id, ...doc.data() } as Availability);
+            });
+            setAvailabilities(availData);
+          },
+          (error) => {
+            console.error('❌ Erreur listener availabilities:', error);
+          }
+        );
+
+        return unsubscribe;
+      } catch (error) {
+        console.error('❌ Erreur chargement availabilities:', error);
+      }
+    };
+
+    let unsubscribe: (() => void) | undefined;
+    loadAvailabilities().then(unsub => { unsubscribe = unsub; });
+
+    return () => unsubscribe?.();
   }, []);
 
   // Charger les amis
@@ -118,105 +164,164 @@ const MyEventsScreen: React.FC<MyEventsScreenProps> = ({ navigation }) => {
     const user = auth.currentUser;
     if (!user) return;
 
-    const friendsQuery = query(
-      collection(db, 'friends'),
-      where('userId', '==', user.uid),
-      where('status', '==', 'accepted')
-    );
+    const loadFriends = async () => {
+      try {
+        const friendsQuery = query(
+          collection(db, 'friends'),
+          where('userId', '==', user.uid),
+          where('status', '==', 'accepted')
+        );
 
-    const unsubscribe = onSnapshot(friendsQuery, async (snapshot) => {
-      const friendsData: (Friend & { friendData?: User })[] = [];
-      
-      for (const docSnapshot of snapshot.docs) {
-        const friendData = { ...docSnapshot.data(), id: docSnapshot.id } as Friend;
-        
-        // Récupérer les données de l'ami
-        try {
-          const friendDoc = await getDoc(doc(db, 'users', friendData.friendId));
-          if (friendDoc.exists()) {
-            friendsData.push({
-              ...friendData,
-              friendData: { ...friendDoc.data(), id: friendDoc.id } as User
-            });
+        // Fonction pour traiter les amis
+        const processFriends = async (snapshot: any) => {
+          const friendsData: (Friend & { friendData?: User })[] = [];
+          
+          for (const docSnapshot of snapshot.docs) {
+            const friendData = { ...docSnapshot.data(), id: docSnapshot.id } as Friend;
+            
+            // Récupérer les données de l'ami
+            try {
+              const friendDoc = await getDoc(doc(db, 'users', friendData.friendId));
+              if (friendDoc.exists()) {
+                friendsData.push({
+                  ...friendData,
+                  friendData: { ...friendDoc.data(), id: friendDoc.id } as User
+                });
+              }
+            } catch (error) {
+              console.error('Erreur lors du chargement des données de l\'ami:', error);
+            }
           }
-        } catch (error) {
-          console.error('Erreur lors du chargement des données de l\'ami:', error);
-        }
-      }
-      
-      setFriends(friendsData);
-    });
+          
+          setFriends(friendsData);
+        };
 
-    return unsubscribe;
+        // Charger d'abord avec getDocs
+        const initialSnapshot = await getDocs(friendsQuery);
+        await processFriends(initialSnapshot);
+
+        // Puis établir le listener
+        const unsubscribe = onSnapshot(friendsQuery, 
+          processFriends,
+          (error) => {
+            console.error('❌ Erreur listener friends:', error);
+          }
+        );
+
+        return unsubscribe;
+      } catch (error) {
+        console.error('❌ Erreur chargement friends:', error);
+      }
+    };
+
+    let unsubscribe: (() => void) | undefined;
+    loadFriends().then(unsub => { unsubscribe = unsub; });
+
+    return () => unsubscribe?.();
   }, []);
 
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
 
-    // Récupérer tous les événements où l'utilisateur est encore participant
-    const q = query(
-      collection(db, 'events'),
-      where('participants', 'array-contains', user.uid),
-      orderBy('startDate', 'desc')
-    );
+    const loadEvents = async () => {
+      try {
+        // Récupérer tous les événements où l'utilisateur est encore participant
+        const q = query(
+          collection(db, 'events'),
+          where('participants', 'array-contains', user.uid),
+          orderBy('startDate', 'desc')
+        );
 
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      const eventsData: EventWithCreator[] = [];
+        // Fonction pour traiter les événements
+        const processEvents = async (snapshot: any) => {
+      // D'abord, afficher les événements sans les noms (chargement rapide)
+      const quickEventsData: EventWithCreator[] = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        creatorName: 'Chargement...',
+        participantNames: [],
+        hasConflict: false,
+        userStillParticipating: true,
+      } as EventWithCreator));
       
+      setEvents(quickEventsData);
+      setLoading(false);
+      
+      // Ensuite, charger les détails en arrière-plan
+      const detailedEventsData: EventWithCreator[] = [];
+      
+      // Collecter tous les IDs uniques pour un chargement en batch
+      const allUserIds = new Set<string>();
+      snapshot.docs.forEach(docSnapshot => {
+        const eventData = docSnapshot.data() as Event;
+        allUserIds.add(eventData.creatorId);
+        eventData.participants.forEach(id => allUserIds.add(id));
+      });
+      
+      // Charger tous les utilisateurs en parallèle
+      const userPromises = Array.from(allUserIds).map(id => getUserFromCache(id));
+      await Promise.all(userPromises);
+      
+      // Maintenant traiter les événements avec les données en cache
       for (const docSnapshot of snapshot.docs) {
         const eventData = { id: docSnapshot.id, ...docSnapshot.data() } as Event;
         
-        // Vérifier si l'utilisateur actuel est encore dans les participants
         const userStillParticipating = eventData.participants.includes(user.uid);
-        
-        // Si l'utilisateur n'est plus participant mais que l'événement avait des conflits,
-        // on peut supposer qu'il a été retiré automatiquement
         const hasConflictWithUser = hasEventConflict(eventData, availabilities);
         
-        // Récupérer le nom du créateur et des participants
-        try {
-          const creatorDoc = await getDoc(doc(db, 'users', eventData.creatorId));
-          const creatorName = creatorDoc.exists() ? creatorDoc.data().displayName : 'Utilisateur inconnu';
-          
-          // Récupérer les noms de tous les participants ACTUELS
-          const participantNames: string[] = [];
-          for (const participantId of eventData.participants) {
-            try {
-              const participantDoc = await getDoc(doc(db, 'users', participantId));
-              if (participantDoc.exists()) {
-                participantNames.push(participantDoc.data().displayName);
-              }
-            } catch (error) {
-              console.error('Erreur lors de la récupération du participant:', error);
-            }
+        // Récupérer depuis le cache (rapide maintenant)
+        const creator = await getUserFromCache(eventData.creatorId);
+        const creatorName = creator?.displayName || 'Utilisateur inconnu';
+        
+        // Récupérer les noms des participants depuis le cache
+        const participantNames: string[] = [];
+        for (const participantId of eventData.participants) {
+          const participant = await getUserFromCache(participantId);
+          if (participant) {
+            participantNames.push(participant.displayName);
           }
-          
-          eventsData.push({
-            ...eventData,
-            creatorName,
-            participantNames,
-            hasConflict: hasConflictWithUser,
-            userStillParticipating
-          });
-        } catch (error) {
-          console.error('Erreur lors de la récupération des données:', error);
-          eventsData.push({
-            ...eventData,
-            creatorName: 'Utilisateur inconnu',
-            participantNames: [],
-            hasConflict: hasConflictWithUser,
-            userStillParticipating
-          });
         }
+        
+        detailedEventsData.push({
+          ...eventData,
+          creatorName,
+          participantNames,
+          hasConflict: hasConflictWithUser,
+          userStillParticipating
+        });
       }
 
-      setEvents(eventsData);
-      setLoading(false);
-      setRefreshing(false);
-    });
+          // Mettre à jour avec les données détaillées
+          setEvents(detailedEventsData);
+          setRefreshing(false);
+        };
 
-    return () => unsubscribe();
+        // Charger d'abord avec getDocs
+        const initialSnapshot = await getDocs(q);
+        await processEvents(initialSnapshot);
+        setLoading(false);
+
+        // Puis établir le listener
+        const unsubscribe = onSnapshot(q, 
+          processEvents,
+          (error) => {
+            console.error('❌ Erreur listener events:', error);
+            setLoading(false);
+          }
+        );
+
+        return unsubscribe;
+      } catch (error) {
+        console.error('❌ Erreur chargement events:', error);
+        setLoading(false);
+      }
+    };
+
+    let unsubscribe: (() => void) | undefined;
+    loadEvents().then(unsub => { unsubscribe = unsub; });
+
+    return () => unsubscribe?.();
   }, [availabilities]);
 
   const onRefresh = () => {
@@ -281,6 +386,14 @@ const MyEventsScreen: React.FC<MyEventsScreenProps> = ({ navigation }) => {
       [{ text: 'OK', style: 'default' }]
     );
   };
+
+  const renderSkeletonItem = () => (
+    <View style={styles.eventCard}>
+      <View style={[styles.skeletonLine, { width: '60%', height: 20, marginBottom: 8 }]} />
+      <View style={[styles.skeletonLine, { width: '40%', height: 16, marginBottom: 12 }]} />
+      <View style={[styles.skeletonLine, { width: '80%', height: 14 }]} />
+    </View>
+  );
 
   const renderEvent = ({ item }: { item: EventWithCreator }) => {
     const isParticipant = item.participants.includes(auth.currentUser?.uid || '');
@@ -361,25 +474,44 @@ const MyEventsScreen: React.FC<MyEventsScreenProps> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Mes Événements</Text>
-        <Text style={styles.headerSubtitle}>
-          {events.length} événement{events.length > 1 ? 's' : ''}
-        </Text>
-      </View>
-
-      <FlatList
-        ref={flatListRef}
-        data={events}
-        renderItem={renderEvent}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        ListEmptyComponent={!loading ? <EmptyState /> : null}
-        showsVerticalScrollIndicator={false}
-      />
+      {loading && events.length === 0 ? (
+        <FlatList
+          data={[1, 2, 3, 4]} // Skeleton items
+          renderItem={renderSkeletonItem}
+          keyExtractor={(item) => `skeleton-${item}`}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={() => (
+            <View style={styles.header}>
+              <Text style={styles.headerTitle}>Mes Événements</Text>
+              <Text style={styles.headerSubtitle}>
+                {events.length} événement{events.length > 1 ? 's' : ''}
+              </Text>
+            </View>
+          )}
+        />
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={events}
+          renderItem={renderEvent}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContainer}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          ListEmptyComponent={!loading ? <EmptyState /> : null}
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={() => (
+            <View style={styles.header}>
+              <Text style={styles.headerTitle}>Mes Événements</Text>
+              <Text style={styles.headerSubtitle}>
+                {events.length} événement{events.length > 1 ? 's' : ''}
+              </Text>
+            </View>
+          )}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -392,21 +524,21 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: 'transparent',
     paddingHorizontal: 20,
-    paddingTop: 80,
-    paddingBottom: 25,
+    paddingTop: 20,
+    paddingBottom: 15,
     borderBottomWidth: 0,
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '800',
     color: '#1A3B5C',
     letterSpacing: 0.5,
     textAlign: 'center',
   },
   headerSubtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#FFB800',
-    marginTop: 8,
+    marginTop: 4,
     fontWeight: '600',
     textAlign: 'center',
   },
@@ -514,6 +646,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 1,
+  },
+  skeletonLine: {
+    backgroundColor: '#E0E0E0',
+    borderRadius: 4,
+    overflow: 'hidden',
   },
 });
 

@@ -188,6 +188,15 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           </Text>
         </TouchableOpacity>
 
+        <TouchableOpacity 
+          style={[styles.button, styles.privacyButton]}
+          onPress={() => navigation.navigate('TermsOfUse')}
+        >
+          <Text style={styles.buttonText}>
+            Conditions d'utilisation
+          </Text>
+        </TouchableOpacity>
+
         {/* Spacer pour pousser les boutons vers le bas */}
         <View style={styles.spacer} />
 
@@ -223,10 +232,20 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         isPremium={isPremium}
         onUpgrade={async () => {
           setShowPremiumModal(false);
-          // Attendre un peu pour que StoreKit se mette à jour
-          setTimeout(async () => {
-            await checkPremiumStatus();
-          }, 1000);
+          
+          // Forcer une vérification immédiate
+          await checkPremiumStatus();
+          
+          // Puis vérifier plusieurs fois pour s'assurer que le statut est à jour
+          const checkMultipleTimes = async () => {
+            for (let i = 0; i < 5; i++) {
+              await new Promise(resolve => setTimeout(resolve, 1000)); // Attendre 1 seconde
+              await checkPremiumStatus();
+              if (isPremium) break; // Arrêter si déjà premium
+            }
+          };
+          
+          checkMultipleTimes();
           
           // Rafraîchir plus fréquemment après un achat (toutes les 10 secondes pendant 1 minute)
           if (refreshInterval) {

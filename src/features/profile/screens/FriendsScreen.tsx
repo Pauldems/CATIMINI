@@ -73,14 +73,22 @@ export default function FriendsScreen({ navigation }: any) {
       setMarkedDates({});
       setEvents([]);
       
-      loadFriends();
-      loadAllAvailabilities();
-      // Charger les événements avec un léger délai pour s'assurer que tout est prêt
-      const timer = setTimeout(() => {
-        loadEvents();
-      }, 200);
+      let unsubscribeAvailabilities: (() => void) | undefined;
+      let unsubscribeEvents: (() => void) | undefined;
       
-      return () => clearTimeout(timer);
+      // Charger toutes les données
+      const loadData = async () => {
+        await loadFriends();
+        unsubscribeAvailabilities = await loadAllAvailabilities();
+        unsubscribeEvents = await loadEvents();
+      };
+      
+      loadData();
+      
+      return () => {
+        unsubscribeAvailabilities?.();
+        unsubscribeEvents?.();
+      };
     }
   }, [currentGroup, refreshTrigger]);
 
@@ -136,27 +144,49 @@ export default function FriendsScreen({ navigation }: any) {
     setFriends(friendsData);
   };
 
-  const loadAllAvailabilities = () => {
+  const loadAllAvailabilities = async () => {
     if (!auth.currentUser || !currentGroup) return;
 
-    // Charger toutes les disponibilités
-    const availQuery = query(
-      collection(db, 'availabilities')
-    );
+    try {
+      // Charger toutes les disponibilités
+      const availQuery = query(
+        collection(db, 'availabilities')
+      );
 
-    const unsubscribe = onSnapshot(availQuery, (snapshot) => {
-      const allAvails: { [userId: string]: Availability[] } = {};
-      
-      snapshot.forEach((doc) => {
-        const data = doc.data() as Availability;
-        
-        if (!allAvails[data.userId]) {
-          allAvails[data.userId] = [];
+      // Charger d'abord avec getDocs
+      const initialSnapshot = await getDocs(availQuery);
+      processAvailabilities(initialSnapshot);
+
+      // Puis établir le listener
+      const unsubscribe = onSnapshot(availQuery, 
+        (snapshot) => {
+          processAvailabilities(snapshot);
+        },
+        (error) => {
+          console.error('❌ Erreur listener availabilities:', error);
+          getDocs(availQuery).then(processAvailabilities).catch(console.error);
         }
-        allAvails[data.userId].push({ ...data, id: doc.id });
-      });
+      );
 
-      setAvailabilities(allAvails);
+      return unsubscribe;
+    } catch (error) {
+      console.error('❌ Erreur chargement availabilities:', error);
+    }
+  };
+
+  const processAvailabilities = (snapshot: any) => {
+    const allAvails: { [userId: string]: Availability[] } = {};
+    
+    snapshot.forEach((doc: any) => {
+      const data = doc.data() as Availability;
+      
+      if (!allAvails[data.userId]) {
+        allAvails[data.userId] = [];
+      }
+      allAvails[data.userId].push({ ...data, id: doc.id });
+    });
+
+    setAvailabilities(allAvails);
       
       // Reconstruire les marqueurs en préservant les événements existants
       setMarkedDates(prevMarked => {
@@ -224,32 +254,48 @@ export default function FriendsScreen({ navigation }: any) {
       });
     });
 
-    return unsubscribe;
-  };
-
-  const loadEvents = () => {
+  const loadEvents = async () => {
     if (!auth.currentUser || !currentGroup) return;
 
-    // Charger seulement les événements du groupe actuel
-    const eventsQuery = query(
-      collection(db, 'events'),
-      where('groupId', '==', currentGroup.id)
-    );
+    try {
+      // Charger seulement les événements du groupe actuel
+      const eventsQuery = query(
+        collection(db, 'events'),
+        where('groupId', '==', currentGroup.id)
+      );
 
-    const unsubscribe = onSnapshot(eventsQuery, (snapshot) => {
-      const eventsData: Event[] = [];
-      
-      snapshot.forEach((doc) => {
-        const eventData = { ...doc.data(), id: doc.id } as Event;
-        // Dans le calendrier de groupe, afficher TOUS les événements du groupe
-        eventsData.push(eventData);
-      });
-      
-      setEvents(eventsData);
-      updateMarkedDatesWithEvents(eventsData);
+      // Charger d'abord avec getDocs
+      const initialSnapshot = await getDocs(eventsQuery);
+      processEvents(initialSnapshot);
+
+      // Puis établir le listener
+      const unsubscribe = onSnapshot(eventsQuery, 
+        (snapshot) => {
+          processEvents(snapshot);
+        },
+        (error) => {
+          console.error('❌ Erreur listener events:', error);
+          getDocs(eventsQuery).then(processEvents).catch(console.error);
+        }
+      );
+
+      return unsubscribe;
+    } catch (error) {
+      console.error('❌ Erreur chargement events:', error);
+    }
+  };
+
+  const processEvents = (snapshot: any) => {
+    const eventsData: Event[] = [];
+    
+    snapshot.forEach((doc: any) => {
+      const eventData = { ...doc.data(), id: doc.id } as Event;
+      // Dans le calendrier de groupe, afficher TOUS les événements du groupe
+      eventsData.push(eventData);
     });
-
-    return unsubscribe;
+    
+    setEvents(eventsData);
+    updateMarkedDatesWithEvents(eventsData);
   };
 
   const updateMarkedDatesWithEvents = (eventsData: Event[]) => {

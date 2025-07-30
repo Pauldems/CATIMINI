@@ -603,11 +603,32 @@
             </ul>
         </div>
     </div>
+    
+    <div class="warning">
+        <strong>⚠️ Important :</strong> Lorsque vous participez à un événement, des indisponibilités sont automatiquement créées pour bloquer ces créneaux. Ces indisponibilités sont liées à l'événement et seront supprimées automatiquement si l'événement est annulé.
+    </div>
 
 
     <h2 id="groups">👥 Onglet Groupes</h2>
     
-    <p>L'onglet Groupes vous permet de gérer vos différents groupes d'amis, famille ou collègues. C'est ici que vous créez, rejoignez et gérez vos groupes.</p>
+    <p>L'onglet Groupes affiche le calendrier de votre groupe actuel avec tous les événements et indisponibilités des membres. C'est une vue d'ensemble pour voir l'activité et la disponibilité de tout le groupe.</p>
+    
+    <div class="ios-container">
+        <div class="ios-header">
+            <div class="ios-icon">🗓️</div>
+            <div class="ios-title">Calendrier du groupe</div>
+        </div>
+        <div class="ios-content">
+            Dans cet onglet, vous voyez :
+            <ul class="ios-list">
+                <li>Tous les événements du groupe (même ceux auxquels vous ne participez pas)</li>
+                <li>Les cercles jaunes indiquent les jours avec des événements</li>
+                <li>Les cercles bleus indiquent qu'au moins un membre du groupe est indisponible ce jour</li>
+                <li>En appuyant sur une date avec un cercle bleu, vous voyez qui est indisponible</li>
+                <li>Le bouton "Changer" en haut permet de changer de groupe ou d'en gérer</li>
+            </ul>
+        </div>
+    </div>
     
     <h3>Créer un groupe</h3>
     <div class="step">
@@ -692,80 +713,105 @@
     
     <div class="step">
         <span class="step-number">2</span>
-        <strong>Remplissez les informations :</strong>
+        <strong>Remplissez les informations de base :</strong>
         <ul>
             <li><strong>Titre</strong> : Nom de l'événement (ex: "Dîner d'anniversaire")</li>
             <li><strong>Description</strong> : Détails supplémentaires (optionnel)</li>
-            <li><strong>Groupe</strong> : Sélectionnez le groupe concerné</li>
-            <li><strong>Date</strong> : Choisissez la date de l'événement</li>
-            <li><strong>Heure de début</strong> : Définissez l'heure</li>
-            <li><strong>Heure de fin</strong> : Définissez la durée</li>
         </ul>
     </div>
     
     <div class="step">
         <span class="step-number">3</span>
-        <strong>Vérifiez les disponibilités</strong>
+        <strong>Choisissez le mode de recherche :</strong>
         <ul>
-            <li>Un indicateur vous montre combien de personnes sont disponibles</li>
-            <li><span class="color-box" style="background-color: #4CAF50;"></span>Vert : Tout le monde est disponible</li>
-            <li><span class="color-box" style="background-color: #FFB800;"></span>Orange : Certains sont indisponibles</li>
-            <li><span class="color-box" style="background-color: #FF6B6B;"></span>Rouge : Beaucoup sont indisponibles</li>
+            <li><strong>Heures spécifiques</strong> : Pour définir des heures de début et fin précises (ex: 14h00-18h00)</li>
+            <li><strong>Durée en jours</strong> : Pour un événement sur plusieurs jours consécutifs</li>
         </ul>
     </div>
     
     <div class="step">
         <span class="step-number">4</span>
-        <strong>Appuyez sur "Créer l'événement"</strong>
+        <strong>Sélectionnez les participants</strong> parmi les membres de votre groupe
     </div>
-
-    <h3>Trouver le meilleur créneau</h3>
-
-    <h3>Consulter un événement</h3>
-    <ol>
-        <li>Allez dans l'onglet <strong>"Événements"</strong> (4ème icône)</li>
-        <li>Vous verrez tous les événements du groupe (pas seulement ceux auxquels vous participez)</li>
-        <li>Appuyez sur un événement pour voir :
-            <ul>
-                <li>Les détails de l'événement</li>
-                <li>La liste des participants disponibles ✅</li>
-                <li>La liste des participants indisponibles ❌</li>
-                <li>Si vous êtes disponible ou non pour cet événement</li>
-            </ul>
-        </li>
-    </ol>
-
-    <h2 id="colors">🎨 Code des couleurs dans l'application</h2>
     
-    <div class="feature-grid">
-        <div class="feature-card">
-            <div class="icon">📅</div>
-            <h4>Dans le calendrier</h4>
-            <ul>
-                <li><span class="color-box" style="background-color: #1A3B5C;"></span><strong>Fond bleu foncé</strong> : Indisponibilité</li>
-                <li><span class="color-box" style="display: inline-block; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #FFB800; position: relative; margin-right: 8px; vertical-align: middle;"><span style="position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; background-color: #FFB800; border-radius: 50%;"></span></span><strong>Cercle jaune + point</strong> : Vos événements</li>
-                <li><span class="color-box" style="background-color: #FFB800;"></span><strong>Fond jaune</strong> : Date sélectionnée</li>
-            </ul>
+    <div class="step">
+        <span class="step-number">5</span>
+        <strong>Choisissez la date de début de recherche</strong> : À partir de quand chercher un créneau disponible
+    </div>
+    
+    <div class="step">
+        <span class="step-number">6</span>
+        <strong>Appuyez sur "Rechercher des créneaux"</strong> - L'algorithme trouve automatiquement les créneaux où tous les participants sélectionnés sont disponibles
+    </div>
+    
+    <div class="step">
+        <span class="step-number">7</span>
+        <strong>Choisissez un créneau</strong> parmi les propositions
+    </div>
+    
+    <div class="step">
+        <span class="step-number">8</span>
+        <strong>Appuyez sur "Créer l'événement"</strong> pour confirmer
+    </div>
+
+    <h3>Comment fonctionne la recherche de créneaux</h3>
+    
+    <div class="ios-container">
+        <div class="ios-header">
+            <div class="ios-icon">🔍</div>
+            <div class="ios-title">Algorithme intelligent</div>
         </div>
-        
-        <div class="feature-card">
-            <div class="icon">👥</div>
-            <h4>Dans la liste des événements</h4>
-            <ul>
-                <li><strong>Tous les événements</strong> : Vous voyez tous les événements du groupe</li>
-                <li><strong>Participants affichés</strong> : Nombre de personnes disponibles</li>
+        <div class="ios-content">
+            L'application analyse automatiquement :
+            <ul class="ios-list">
+                <li>Les indisponibilités de tous les participants sélectionnés</li>
+                <li>Les événements existants auxquels ils participent déjà</li>
+                <li>La durée souhaitée pour votre événement</li>
+                <li>Les créneaux libres sur les 3 prochains mois</li>
             </ul>
+            Elle propose jusqu'à 10 créneaux où tout le monde est disponible.
         </div>
-        
-        <div class="feature-card">
-            <div class="icon">🔔</div>
-            <h4>Notifications</h4>
-            <ul>
-                <li><span class="color-box" style="background-color: #E8F4F8;"></span><strong>Bleu</strong> : Non lue</li>
-                <li><span class="color-box" style="background-color: #FFFFFF;"></span><strong>Blanc</strong> : Lue</li>
+    </div>
+    
+    <div class="tip">
+        <strong>💡 Astuce :</strong> Si aucun créneau n'est trouvé, essayez de réduire le nombre de participants ou de modifier les heures souhaitées.
+    </div>
+
+    <h3>Consulter vos événements</h3>
+    
+    <div class="ios-container">
+        <div class="ios-header">
+            <div class="ios-icon">📋</div>
+            <div class="ios-title">Liste de vos événements</div>
+        </div>
+        <div class="ios-content">
+            Dans l'onglet "Événements" (3ème icône), vous trouvez :
+            <ul class="ios-list">
+                <li>Les événements auxquels vous participez</li>
+                <li>Les événements que vous avez créés</li>
+                <li>Chaque événement affiche : titre, date, horaires et nombre de participants</li>
             </ul>
         </div>
     </div>
+    
+    <div class="ios-container">
+        <div class="ios-header">
+            <div class="ios-icon">✏️</div>
+            <div class="ios-title">Gérer vos événements créés</div>
+        </div>
+        <div class="ios-content">
+            Pour gérer vos événements créés :
+            <ul class="ios-list">
+                <li>Appuyez sur le bouton "+" au centre de la barre de navigation</li>
+                <li>Descendez pour voir la section "Mes événements créés"</li>
+                <li>Appuyez sur un événement pour le modifier</li>
+                <li>Utilisez le bouton ✕ rouge pour supprimer un événement</li>
+                <li>La suppression notifiera tous les participants</li>
+                <li>Les indisponibilités liées seront automatiquement supprimées</li>
+            </ul>
+        </div>
+    </div>
+
 
     <h2 id="notifications">🔔 Notifications</h2>
     
@@ -806,25 +852,39 @@
     </ol>
 
     <h3>Comment supprimer un groupe ?</h3>
-    <p>Seul le créateur du groupe peut le supprimer. Dans la page du groupe, appuyez sur les trois points en haut à droite puis "Supprimer le groupe".</p>
+    <p>Seul le créateur du groupe peut le supprimer. Dans l'onglet Groupes, descendez tout en bas de la page pour trouver l'option de suppression.</p>
 
     <h3>Puis-je modifier un événement après sa création ?</h3>
-    <p>Oui ! Le créateur de l'événement peut le modifier en appuyant dessus dans l'onglet "Événements" puis sur "Modifier".</p>
+    <p>Oui ! Pour modifier ou supprimer vos événements : appuyez sur le bouton "+" (création d'événement), puis descendez dans la page pour voir la section "Mes événements créés". Vous pouvez alors appuyer sur un événement pour le modifier ou utiliser le bouton ✕ rouge pour le supprimer.</p>
 
     <h3>Comment quitter un groupe ?</h3>
-    <p>Dans la page du groupe, appuyez sur les trois points en haut à droite puis "Quitter le groupe".</p>
+    <p>Dans l'onglet Groupes, appuyez sur "Changer" en haut de l'écran, puis sur "Gérer mes groupes". Vous pourrez alors quitter le groupe souhaité.</p>
 
+    <h3>Comment fonctionne le système Premium ?</h3>
+    <p>La version gratuite permet :</p>
+    <ul>
+        <li>1 groupe maximum</li>
+        <li>10 indisponibilités maximum</li>
+    </ul>
+    <p>La version Premium (0,99€/mois) offre :</p>
+    <ul>
+        <li>Groupes illimités</li>
+        <li>Indisponibilités illimitées</li>
+    </ul>
+    
+    <h3>Les indisponibilités créées par les événements comptent-elles dans ma limite ?</h3>
+    <p>Non, seules les indisponibilités que vous créez manuellement comptent dans la limite de 10 pour la version gratuite.</p>
+    
     <h2>🆘 Besoin d'aide ?</h2>
     <p>Si vous rencontrez un problème ou avez une question qui n'est pas couverte dans ce guide, n'hésitez pas à nous contacter !</p>
     
     <p>
-        📧 Email : support@creno.app<br>
-        🌐 Site web : www.creno.app
+        🌐 Site web : topal.fr (rubrique "Nous contacter")
     </p>
 
     <hr style="margin-top: 60px; border: 1px solid #E0E0E0;">
     <p style="text-align: center; color: #999; font-size: 0.9em;">
-        © 2024 Créno - Guide d'utilisation v1.0<br>
+        © 2025 Topal - Guide d'utilisation v1.0<br>
         Dernière mise à jour : Janvier 2025
     </p>
     

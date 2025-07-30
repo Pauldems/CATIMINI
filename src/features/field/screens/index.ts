@@ -6,3 +6,4 @@ export { default as GroupManagementScreen } from './GroupManagementScreen';
 export { default as GroupRequiredScreen } from './GroupRequiredScreen';
 export { default as MyEventsScreen } from './MyEventsScreen';
 export { default as PrivacyPolicyScreen } from './PrivacyPolicyScreen';
+export { default as TermsOfUseScreen } from './TermsOfUseScreen';

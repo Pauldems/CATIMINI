@@ -35,7 +35,8 @@ import {
   MyEventsScreen, 
   EventDetailsScreen, 
   GroupManagementScreen, 
-  PrivacyPolicyScreen 
+  PrivacyPolicyScreen,
+  TermsOfUseScreen 
 } from './src/features/field/screens';
 import { FriendsScreen, SettingsScreen } from './src/features/profile/screens';
 
@@ -64,6 +65,7 @@ function AuthStack() {
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
       <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
+      <Stack.Screen name="TermsOfUse" component={TermsOfUseScreen} />
     </Stack.Navigator>
   );
 }
@@ -119,6 +121,11 @@ function MainStack() {
       <Stack.Screen 
         name="PrivacyPolicy" 
         component={PrivacyPolicyScreen}
+        options={TransitionPresets.SlideFromRightIOS}
+      />
+      <Stack.Screen 
+        name="TermsOfUse" 
+        component={TermsOfUseScreen}
         options={TransitionPresets.SlideFromRightIOS}
       />
     </Stack.Navigator>

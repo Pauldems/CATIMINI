@@ -61,7 +61,7 @@ class PremiumService {
       // Vérifier le statut en ligne
       await this.checkPremiumStatus();
       
-      // Configurer la vérification périodique (toutes les 2 minutes pour sandbox)
+      // Configurer la vérification périodique (toutes les 30 minutes en production)
       this.setupPeriodicCheck();
       
       // Écouter les changements d'état de l'app
@@ -197,6 +197,16 @@ class PremiumService {
       console.log('💳 Résultat achat StoreKit:', success);
       
       if (success) {
+        // Mettre à jour immédiatement le statut local
+        this.premiumStatus = { 
+          isPremium: true,
+          subscribedAt: new Date().toISOString(),
+          lastChecked: new Date().toISOString()
+        };
+        
+        // Sauvegarder dans le cache
+        await AsyncStorage.setItem(PREMIUM_STORAGE_KEY, JSON.stringify(this.premiumStatus));
+        
         // Mettre à jour Firebase
         const user = auth.currentUser;
         if (user) {
@@ -208,8 +218,11 @@ class PremiumService {
           });
         }
         
-        this.premiumStatus = { isPremium: true };
-        await AsyncStorage.setItem(PREMIUM_STORAGE_KEY, JSON.stringify(this.premiumStatus));
+        // Forcer une vérification pour obtenir la date d'expiration
+        setTimeout(() => {
+          this.checkPremiumStatus();
+        }, 2000);
+        
         console.log('✨ Premium activé avec succès');
       }
       
@@ -334,11 +347,11 @@ class PremiumService {
       clearInterval(this.checkInterval);
     }
     
-    // Vérifier toutes les 2 minutes (important pour sandbox où les abonnements durent 5 minutes)
+    // Vérifier toutes les 30 minutes en production
     this.checkInterval = setInterval(async () => {
       console.log('⏰ Vérification périodique du statut premium');
       await this.checkPremiumStatus();
-    }, 2 * 60 * 1000); // 2 minutes
+    }, 30 * 60 * 1000); // 30 minutes
   }
 
   private setupAppStateListener() {

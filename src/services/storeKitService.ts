@@ -105,7 +105,7 @@ class StoreKitService {
             // Sauvegarder le statut premium
             // Pour un nouvel achat, calculer l'expiration (sandbox: 5 minutes)
             const now = new Date();
-            const isSandbox = true; // En sandbox, les abonnements mensuels durent 5 minutes
+            const isSandbox = false; // PRODUCTION: mode production App Store
             const durationMs = isSandbox ? 5 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
             const expiresAt = new Date(now.getTime() + durationMs).toISOString();
             
@@ -224,7 +224,7 @@ class StoreKitService {
         // Timeout de sécurité
         setTimeout(() => {
           if (this.purchasePromiseResolve) {
-            reject(new Error('Timeout - Aucune réponse d\'Apple. Vérifiez votre connexion au compte sandbox.'));
+            reject(new Error('Timeout - Aucune réponse d\'Apple. Vérifiez votre connexion internet.'));
             this.purchasePromiseResolve = null;
             this.purchasePromiseReject = null;
           }
@@ -401,9 +401,8 @@ class StoreKitService {
         const purchaseDate = new Date(parseInt(premiumPurchase.transactionDate));
         const now = new Date();
         
-        // Détecter si on est en sandbox (heuristique basée sur le productId)
-        const isSandbox = premiumPurchase.productId.includes('monthly') || 
-                         premiumPurchase.productId.includes('sandbox');
+        // PRODUCTION: Toujours utiliser le mode production
+        const isSandbox = false;
         
         // En sandbox, les abonnements mensuels durent 5 minutes
         const durationMs = isSandbox ? 5 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000; // 5 min ou 30 jours

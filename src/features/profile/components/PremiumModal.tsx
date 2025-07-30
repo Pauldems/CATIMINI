@@ -7,10 +7,12 @@ import {
   StyleSheet, 
   Alert,
   ActivityIndicator,
-  ScrollView 
+  ScrollView,
+  Linking
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import premiumService from '../../../services/premiumService';
+import { useNavigation } from '@react-navigation/native';
 
 interface PremiumModalProps {
   visible: boolean;
@@ -28,6 +30,7 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [price, setPrice] = useState('0,99 €');
   const [isPremium, setIsPremium] = useState(isPremiumProp);
+  const navigation = useNavigation<any>();
 
   useEffect(() => {
     // Vérifier le statut premium et charger le prix à chaque ouverture
@@ -63,11 +66,21 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({
     try {
       const success = await premiumService.activatePremium();
       if (success) {
+        // Forcer une vérification immédiate du statut
+        await premiumService.forceSyncPremiumStatus();
+        
+        // Mettre à jour l'état local
+        setIsPremium(true);
+        
         Alert.alert(
           '🎉 Félicitations !',
           'Vous êtes maintenant Premium. Profitez de toutes les fonctionnalités illimitées !',
-          [{ text: 'Super !', onPress: () => {
-            onUpgrade();
+          [{ text: 'Super !', onPress: async () => {
+            // Attendre un peu pour que tout se synchronise
+            setTimeout(async () => {
+              await premiumService.checkPremiumStatus();
+              onUpgrade();
+            }, 500);
             onClose();
           }}]
         );
@@ -75,16 +88,30 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({
     } catch (error: any) {
       console.error('Erreur dans handleUpgrade:', error);
       
-      // Vérifier si c'est une erreur "déjà abonné"
-      if (error.message && error.message.includes('already')) {
-        Alert.alert(
-          'Déjà abonné',
-          'Vous êtes déjà abonné à Premium.',
-          [{ text: 'OK', onPress: () => {
-            onUpgrade();
-            onClose();
-          }}]
-        );
+      // Vérifier si c'est une erreur "déjà abonné" ou "invalid product"
+      if (error.message && (error.message.includes('already') || error.message.toLowerCase().includes('invalid product'))) {
+        // Vérifier le statut réel
+        const currentStatus = await premiumService.forceSyncPremiumStatus();
+        if (currentStatus) {
+          setIsPremium(true);
+          Alert.alert(
+            '✅ Vous êtes déjà Premium !',
+            'Votre abonnement est actif. Profitez de toutes les fonctionnalités illimitées !',
+            [{ text: 'OK', onPress: () => {
+              onUpgrade();
+              onClose();
+            }}]
+          );
+        } else {
+          Alert.alert(
+            'Erreur',
+            'Un problème est survenu. Essayez de restaurer vos achats.',
+            [
+              { text: 'Annuler', style: 'cancel' },
+              { text: 'Restaurer', onPress: handleRestore }
+            ]
+          );
+        }
       } else if (error.message === 'Achat annulé') {
         // L'utilisateur a annulé, pas besoin d'afficher une alerte
         console.log('Achat annulé par l\'utilisateur');
@@ -196,9 +223,11 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({
                   <Text style={styles.premiumStatusText}>
                     ✨ Vous êtes Premium !
                   </Text>
-                  <Text style={styles.premiumStatusSubtext}>
-                    {premiumService.getRemainingTime()} restant{premiumService.getRemainingTime().includes('minute') ? 's' : ''}
-                  </Text>
+                  {premiumService.getRemainingTime() && !premiumService.getRemainingTime().includes('minute') && (
+                    <Text style={styles.premiumStatusSubtext}>
+                      {premiumService.getRemainingTime()} restant{premiumService.getRemainingTime().includes('jour') ? 's' : ''}
+                    </Text>
+                  )}
                 </View>
               ) : (
                 <Text style={styles.subtitle}>
@@ -294,6 +323,31 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({
                     Restaurer mes achats
                   </Text>
                 </TouchableOpacity>
+                
+                {/* Liens légaux */}
+                <View style={styles.legalLinks}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      onClose();
+                      navigation.navigate('TermsOfUse');
+                    }}
+                    style={styles.legalLinkButton}
+                  >
+                    <Text style={styles.legalLinkText}>Conditions d'utilisation</Text>
+                  </TouchableOpacity>
+                  
+                  <Text style={styles.legalSeparator}>•</Text>
+                  
+                  <TouchableOpacity
+                    onPress={() => {
+                      onClose();
+                      navigation.navigate('PrivacyPolicy');
+                    }}
+                    style={styles.legalLinkButton}
+                  >
+                    <Text style={styles.legalLinkText}>Politique de confidentialité</Text>
+                  </TouchableOpacity>
+                </View>
               </>
             )}
           </ScrollView>
@@ -521,5 +575,25 @@ const styles = StyleSheet.create({
   },
   comparisonHeaderPremium: {
     color: '#FFB800',
+  },
+  legalLinks: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  legalLinkButton: {
+    padding: 4,
+  },
+  legalLinkText: {
+    fontSize: 12,
+    color: '#666',
+    textDecorationLine: 'underline',
+  },
+  legalSeparator: {
+    marginHorizontal: 8,
+    color: '#999',
+    fontSize: 12,
   },
 });
