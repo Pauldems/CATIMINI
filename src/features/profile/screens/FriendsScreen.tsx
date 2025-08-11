@@ -252,7 +252,7 @@ export default function FriendsScreen({ navigation }: any) {
         
         return marked;
       });
-    });
+  };
 
   const loadEvents = async () => {
     if (!auth.currentUser || !currentGroup) return;

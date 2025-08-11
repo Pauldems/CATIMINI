@@ -19,6 +19,7 @@ import {
   onSnapshot,
   doc,
   getDoc,
+  getDocs,
 } from 'firebase/firestore';
 import { Event, Availability, Friend, User } from '../../../types';
 import { Colors } from '../../../theme/colors';

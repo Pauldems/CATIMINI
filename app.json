@@ -2,7 +2,7 @@
   "expo": {
     "name": "Créno",
     "slug": "catimini-app",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.catimini.app",
-      "buildNumber": "52",
+      "buildNumber": "53",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": [
@@ -39,7 +39,7 @@
       }
     },
     "android": {
-      "versionCode": 52,
+      "versionCode": 53,
       "package": "com.catimini.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

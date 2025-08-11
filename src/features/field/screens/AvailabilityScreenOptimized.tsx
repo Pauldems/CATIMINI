@@ -67,7 +67,7 @@ const MemoizedCalendar = memo(({
   return areMarkedDatesEqual(prevProps.markedDates, nextProps.markedDates);
 });
 
-export default function AvailabilityScreen({ navigation }: any) {
+export default function AvailabilityScreenOptimized({ navigation }: any) {
   const { currentGroup, loading: groupLoading, needsGroupSelection } = useCurrentGroup();
   const scrollViewRef = useRef<ScrollView>(null);
   const isMounted = useIsMounted();

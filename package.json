@@ -1,6 +1,6 @@
 {
   "name": "catiminiapp",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
@@ -15,6 +15,7 @@
     "@react-navigation/bottom-tabs": "^7.4.2",
     "@react-navigation/native": "^7.1.14",
     "@react-navigation/stack": "^7.4.2",
+    "@types/lodash": "^4.17.20",
     "expo": "53.0.20",
     "expo-dev-client": "~5.2.4",
     "expo-device": "^7.1.4",
@@ -22,6 +23,7 @@
     "expo-notifications": "^0.31.4",
     "expo-status-bar": "~2.2.3",
     "firebase": "^11.10.0",
+    "lodash": "^4.17.21",
     "react": "19.0.0",
     "react-native": "0.79.5",
     "react-native-calendars": "^1.1313.0",
